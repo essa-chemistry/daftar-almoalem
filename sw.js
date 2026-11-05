@@ -1,5 +1,5 @@
 // Service Worker: يعمل التطبيق بلا إنترنت (الملفات محلياً + مكتبات CDN بعد أول تحميل)
-const VERSION = 'daftar-v1.0.0';
+const VERSION = 'daftar-v2.0.0';
 const SHELL = [
   './', './index.html', './student.html', './config.js', './manifest.json', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './css/app.css', './css/print.css',
@@ -7,6 +7,7 @@ const SHELL = [
   './js/grading.js', './js/gradeutil.js', './js/picker.js', './js/defaults.js', './js/ops.js', './js/demo.js', './js/print.js', './js/backup.js',
   './js/views/today.js', './js/views/session.js', './js/views/classes.js', './js/views/student.js', './js/views/importer.js',
   './js/views/tasks.js', './js/views/grades.js', './js/views/printview.js', './js/views/settings.js',
+  './js/forms.js', './js/views/forms.js', './js/views/paper.js', './js/views/names.js',
 ];
 const CDN = ['https://unpkg.com/htm@3.1.1/preact/standalone.module.js'];
 
