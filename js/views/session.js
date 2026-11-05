@@ -2,7 +2,7 @@
 import { html, render, useState, useEffect, useRef, useMemo } from '../lib.js';
 import { S, get, ws, all, save, patch, purge, workspace, roster, className, sessionAttendance, sessionEvents, eventTypes, typeBySys, privateOf } from '../store.js';
 import { useStore, Icon, Avatar, Btn, openModal, ModalHead, toast, formDialog, confirmDialog, go, useLongPress, Empty } from '../ui.js';
-import { setAttendance, addEvent, voidEvent, openSession } from '../ops.js';
+import { setAttendance, addEvent, voidEvent, openSession, deleteSession, sessionContents } from '../ops.js';
 import { choose } from '../picker.js';
 import { periodInfo, termOf } from '../calendar.js';
 import { plannedFor, progress } from '../plan.js';
@@ -65,6 +65,7 @@ export function SessionPage({ id }) {
       <div class="grow"><h1>${className(cls)}</h1><div class="muted small">${fmtDateLong(s.date)} ${s.period ? `• الحصة ${s.period}` : '• حصة يدوية'} ${per ? `(${per.start}–${per.end})` : ''} ${s.status === 'closed' ? html`<span class="badge">منتهية</span>` : null}</div></div>
       ${remaining != null && remaining > 0 && remaining < 120 ? html`<span class=${'timer' + (remaining <= 5 ? ' low' : '')}><${Icon} name="clock" size=${16} /> ${remaining} دقيقة</span>` : null}
       <button class="btn sm ghost" onClick=${() => printHTML(sessionSheet({ classId: s.class_id, date: s.date, period: s.period }))}><${Icon} name="print" size=${16} /> كشف الحصة</button>
+      <button class="btn sm ghost" title="حذف الحصة (إن فُتحت بالخطأ)" onClick=${() => removeSession(s)}><${Icon} name="trash" size=${16} /></button>
       <${Btn} cls="sm deep" onClick=${() => endSession(s.id)}><${Icon} name="stop" size=${16} /> إنهاء الحصة</${Btn}>
     </div>
     <${PlanBar} s=${s} />
@@ -435,4 +436,17 @@ function PlanBar({ s }) {
     ${s.plan_done ? html`<select style="width:auto;min-height:36px" value=${n} onChange=${e => patch('sessions', s.id, { plan_units: +e.target.value })}>${[1, 2, 3].map(k => html`<option value=${k}>${k === 1 ? 'حصة واحدة' : k + ' حصص من الخطة'}</option>`)}</select>` : null}
     <button class=${'btn sm ' + (s.plan_done ? 'primary' : 'soft')} onClick=${toggle}>${s.plan_done ? '✓ تم الشرح' : 'تم الشرح'}</button>
   </div>`;
+}
+
+// ---------- حذف حصة فُتحت بالخطأ ----------
+async function removeSession(s) {
+  const c = sessionContents(s.id);
+  const n = c.events.length + c.attendance.length + c.picks.length;
+  const detail = n ? `سيُحذف معها ما سُجّل فيها: ${c.events.length} حدث، ${c.attendance.length} غياب/تأخر، ${c.picks.length} اختيار.` : 'لم يُسجَّل فيها شيء.';
+  const v = await formDialog({ title: 'حذف الحصة', fields: [{ name: 'reason', label: 'السبب', value: 'فُتحت بالخطأ', required: true, full: true }], okText: 'متابعة' });
+  if (!v) return;
+  if (!await confirmDialog({ title: 'تأكيد حذف الحصة', message: `${detail}\nلا تُحتسب الحصة المحذوفة في الحضور ولا في الدرجات. الملاحظات الخاصة تبقى.`, danger: true, okText: 'حذف الحصة' })) return;
+  await deleteSession(s.id, v.reason);
+  undoStacks.delete(s.id);
+  toast('حُذفت الحصة', 'ok'); go('#/today');
 }
