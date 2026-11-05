@@ -57,6 +57,8 @@ export function TodayPage() {
   }
   const reminders = all('notes', n => n.kind === 'reminder' && !n.done && n.workspace_id === S.wsId && n.date >= addDays(today, -14));
   for (const n of reminders) alerts.push({ icon: 'note', text: html`تذكير: ${n.text}${n.student_id ? html` — <b>${get('students', n.student_id)?.full_name || ''}</b>` : ''}`, href: n.student_id ? `#/student/${n.student_id}?tab=notes` : null });
+  for (const r of ws('referrals', r => r.status !== 'resolved' && r.date <= addDays(today, -2)))
+    alerts.push({ icon: 'file', warn: true, text: html`إحالة بانتظار الرد منذ ${fmtDate(r.date, 'g')}: <b>${get('students', r.student_id)?.full_name || ''}</b> — ${{ sent: 'أُرسلت', received: 'استُلمت' }[r.status] || ''}`, href: '#/form/referral?id=' + r.id });
   const lastBackup = localStorage.getItem('daftar-last-backup');
   const needBackup = !lastBackup || daysBetween(lastBackup.slice(0, 10), today) >= 7;
 

@@ -6,14 +6,19 @@ import { termRange, currentTerm, meetingsOn, meetingsRange, isHeldStatus } from 
 import { printHTML, weeklySheet, sessionSheet, taskSheet } from '../print.js';
 import { todayISO, weekStart, addDays, fmtDate, fmtShort, DAY_NAMES, dow } from '../utils.js';
 import { TASK_KINDS } from '../grading.js';
+import { Tabs, go } from '../ui.js';
+import { FormsCenter } from './forms.js';
 
 export function PrintPage({ q = {} }) {
   useStore();
+  const tab = q.tab || 'sheets';
+  const tabsEl = html`<${Tabs} active=${tab} onChange=${t => go('#/print?tab=' + t)} tabs=${[{ key: 'sheets', label: 'الكشوف' }, { key: 'forms', label: 'النماذج والإحالات' }]} />`;
   const cls = classes(); const w = workspace(); const today = todayISO();
   const t = currentTerm(w, today); const tr = termRange(w, t);
   const [o, setO] = useState({ classId: q.class || cls[0]?.id || '', range: 'week', term: t, from: weekStart(today), weeks: 4, to: addDays(weekStart(today), 27), wpp: 'auto', extra: 3, prefill: false, hijri: true });
   const [s, setS] = useState({ classId: q.class || cls[0]?.id || '', date: today, period: '', prefill: true, whole: false });
   const [tk, setTk] = useState({ taskId: '', classId: '' });
+  if (tab === 'forms') return html`<div class="page"><div class="page-head"><div><h1>الطباعة والنماذج</h1><div class="sub">كل نموذج يُعبّأ تلقائياً ويمكن تعديل أي حقل قبل الطباعة.</div></div></div>${tabsEl}<${FormsCenter} /></div>`;
   if (!cls.length) return html`<div class="page"><div class="card"><${Empty} icon="print" title="لا توجد فصول بعد" /></div></div>`;
   const set = (k, v) => setO(x => ({ ...x, [k]: v }));
 
@@ -35,7 +40,8 @@ export function PrintPage({ q = {} }) {
   const task = get('tasks', tk.taskId);
 
   return html`<div class="page">
-    <div class="page-head"><div><h1>الطباعة</h1><div class="sub">كل الكشوف بترويسة المدرسة والشعارين، A4، وتصلح للحفظ PDF من نافذة الطباعة.</div></div></div>
+    <div class="page-head"><div><h1>الطباعة والنماذج</h1><div class="sub">كل الكشوف بترويسة المدرسة والشعارين، A4، وتصلح للحفظ PDF من نافذة الطباعة.</div></div></div>
+    ${tabsEl}
     ${!w.logos?.ministry || !w.logos?.school ? html`<div class="notice" style="margin-bottom:14px">لم تُرفع كل الشعارات بعد — ارفع شعار الوزارة وشعار المدرسة من <a href="#/settings/school">الإعدادات ← المدرسة</a>.</div>` : null}
     <div class="grid-2">
       <div class="card stack"><h2><${Icon} name="calendar" /> كشف المتابعة الأسبوعي</h2>
@@ -70,7 +76,9 @@ export function PrintPage({ q = {} }) {
       <div class="card stack"><h2><${Icon} name="grades" /> كشوف الدرجات</h2>
         <p class="muted" style="margin:0">كشف درجات الفصل وكشف تفصيل درجة الطالب يُطبعان من صفحة الدرجات.</p>
         <a class="btn" href="#/grades">الذهاب إلى الدرجات</a>
-        <p class="muted small" style="margin:0">النماذج (رصد مشكلة سلوكية، الإحالة، تقرير ولي الأمر) والإدخال السريع من الكشف الورقي تأتي في المرحلة 2.</p>
+        <h2 style="margin-top:8px"><${Icon} name="edit" /> الإدخال السريع من الكشف الورقي</h2>
+        <p class="muted" style="margin:0">انقل ما كتبته بالقلم في كشف المتابعة: شاشة بنفس شكل الكشف تكتب فيها الرموز فتتحول إلى أحداث بتاريخ الحصة.</p>
+        <a class="btn soft" href=${`#/paper?class=${o.classId}&from=${o.range === 'week' ? o.from : ''}`}>فتح الإدخال من الكشف</a>
       </div>
     </div></div>`;
 }

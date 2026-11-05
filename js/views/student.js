@@ -8,6 +8,7 @@ import { todayISO, fmtDate, compressImage, fmtNum } from '../utils.js';
 import { currentTerm } from '../calendar.js';
 import { ATT_STATUS } from '../grading.js';
 import { workspace } from '../store.js';
+import { ReferralsList } from './forms.js';
 
 export function StudentPage({ id, tab = 'profile' }) {
   useStore();
@@ -26,14 +27,17 @@ export function StudentPage({ id, tab = 'profile' }) {
       <div class="actions">
         <button class="btn ghost" onClick=${() => patch('student_private', id, { ...pv, starred: !pv.starred })}><${Icon} name="star" /> ${pv.starred ? 'إلغاء المتابعة' : 'متابعة'}</button>
         ${cls ? html`<a class="btn soft" href=${`#/grade/${cls.id}/${currentTerm(workspace(), todayISO())}/${id}`}><${Icon} name="grades" /> شرح الدرجة</a>` : null}
+        <a class="btn" href=${'#/form/parent?student=' + id}><${Icon} name="users" /> تقرير ولي الأمر</a>
+        <a class="btn" href=${'#/form/behavior?student=' + id}><${Icon} name="alert" /> رصد مشكلة سلوكية</a>
+        <a class="btn" href=${'#/form/referral?student=' + id}><${Icon} name="file" /> إحالة</a>
       </div></div>
-    <${Tabs} active=${tab} onChange=${setTab} tabs=${[{ key: 'profile', label: 'البيانات' }, { key: 'notes', label: 'ملاحظات خاصة', badge: notesN || null }, { key: 'contacts', label: 'التواصل مع ولي الأمر' }, { key: 'log', label: 'السجل' }, { key: 'life', label: 'التسجيل والنقل' }, { key: 'ref', label: 'الإحالات' }]} />
+    <${Tabs} active=${tab} onChange=${setTab} tabs=${[{ key: 'profile', label: 'البيانات' }, { key: 'notes', label: 'ملاحظات خاصة', badge: notesN || null }, { key: 'contacts', label: 'التواصل مع ولي الأمر' }, { key: 'log', label: 'السجل' }, { key: 'life', label: 'التسجيل والنقل' }, { key: 'ref', label: 'الإحالات', badge: ws('referrals', r => r.student_id === id && r.status !== 'resolved').length || null }]} />
     ${tab === 'profile' ? html`<${Profile} st=${st} pv=${pv} />` : null}
     ${tab === 'notes' ? html`<${Notes} st=${st} />` : null}
     ${tab === 'contacts' ? html`<${Contacts} st=${st} />` : null}
     ${tab === 'log' ? html`<${Log} st=${st} />` : null}
     ${tab === 'life' ? html`<${Life} st=${st} />` : null}
-    ${tab === 'ref' ? html`<div class="card"><${Empty} icon="file" title="الإحالات">نماذج الإحالة وتتبع حالتها تأتي في المرحلة 2.</${Empty}></div>` : null}
+    ${tab === 'ref' ? html`<div class="card"><div class="row" style="margin-bottom:12px"><h2 style="margin:0">الإحالات</h2><span class="grow"></span><a class="btn primary sm" href=${'#/form/referral?student=' + id}><${Icon} name="plus" size=${16} /> إحالة جديدة</a></div><${ReferralsList} studentId=${id} /></div>` : null}
   </div>`;
 }
 

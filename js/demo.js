@@ -136,5 +136,35 @@ export async function seedDemo() {
     { student_id: sB[1].id, date: addDays(today, -3), kind: 'reminder', text: 'التواصل مع ولي الأمر بخصوص التأخر المتكرر' },
   ]);
   await save('contacts', { student_id: sB[1].id, date: addDays(today, -2), method: 'اتصال', summary: 'تم إبلاغ ولي الأمر بتكرار التأخر، ووعد بالمتابعة' });
+  // المرحلة 2: إحالتان وصور توضيحية لتجربة «اختبر نفسك في الأسماء»
+  await saveMany('referrals', [
+    { student_id: sB[1].id, class_id: B.id, date: addDays(today, -4), period: 3, subject: 'كيمياء', to_role: 'counselor', reasons: ['تكرار التأخر'], description: 'تأخر متكرر عن بداية الحصة رغم التنبيه.', severity: 'متوسطة', prior: ['تنبيه الطالب شفهياً', 'تواصل مع ولي الأمر (اتصال)'], requested: 'الاطلاع واتخاذ الإجراء المناسب وإفادتنا بالنتيجة.', status: 'received', history: [{ status: 'sent', date: addDays(today, -4) }, { status: 'received', date: addDays(today, -3) }] },
+    { student_id: sA[2].id, class_id: A.id, date: addDays(today, -20), period: 2, subject: 'كيمياء', to_role: 'deputy', reasons: ['النوم المتكرر في الحصة'], description: '', severity: 'بسيطة', prior: [], requested: 'الاطلاع.', status: 'resolved', response: 'استجاب', outcome: 'تم توجيه الطالب والتواصل مع ولي أمره', history: [] },
+  ]);
+  if (typeof document !== 'undefined') {
+    const photos = [...sA, ...sB].map((s, i) => ({ id: s.id, student_id: s.id, data: demoPortrait(i), status: 'approved', source: 'demo' }));
+    await saveMany('student_photos', photos);
+  }
   return w;
+}
+
+// صورة توضيحية مرسومة (ليست صورة حقيقية) لتجربة شاشة الأسماء في الوضع التجريبي
+function demoPortrait(i) {
+  const c = document.createElement('canvas'); c.width = c.height = 240; const g = c.getContext('2d');
+  const hue = (i * 47) % 360;
+  const bg = g.createLinearGradient(0, 0, 240, 240); bg.addColorStop(0, `hsl(${hue} 55% 78%)`); bg.addColorStop(1, `hsl(${(hue + 40) % 360} 50% 58%)`);
+  g.fillStyle = bg; g.fillRect(0, 0, 240, 240);
+  const skin = ['#e8b98f', '#d9a679', '#c68e5f', '#b07a4f'][i % 4];
+  g.fillStyle = i % 3 === 0 ? '#f4f4f4' : '#c0392b'; // الشماغ أو الغترة
+  g.beginPath(); g.moveTo(52, 240); g.quadraticCurveTo(120, 70, 188, 240); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.ellipse(120, 232, 70, 46, 0, Math.PI, 0); g.fill();
+  g.fillStyle = skin; g.beginPath(); g.ellipse(120, 112, 38, 46, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = i % 3 === 0 ? '#f4f4f4' : '#c0392b'; g.beginPath(); g.ellipse(120, 92, 46, 34, 0, Math.PI, 0); g.fill();
+  if (i % 3 === 1) { g.strokeStyle = '#fff'; g.lineWidth = 3; for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(80 + k * 14, 70); g.lineTo(80 + k * 14 + 8, 96); g.stroke(); } }
+  g.strokeStyle = '#111'; g.lineWidth = 6; g.beginPath(); g.ellipse(120, 64, 40, 9, 0, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = '#2b2b2b'; g.beginPath(); g.arc(106, 112, 4, 0, 7); g.arc(134, 112, 4, 0, 7); g.fill();
+  if (i % 4 === 2) { g.strokeStyle = '#333'; g.lineWidth = 3; g.strokeRect(94, 104, 22, 15); g.strokeRect(124, 104, 22, 15); }
+  if (i % 2 === 1) { g.fillStyle = '#3b2a20'; g.beginPath(); g.ellipse(120, 146, 20 + (i % 3) * 4, 9, 0, 0, Math.PI); g.fill(); }
+  g.strokeStyle = '#7a4a35'; g.lineWidth = 3; g.beginPath(); g.arc(120, 132, 10, 0.2, Math.PI - 0.2); g.stroke();
+  return c.toDataURL('image/webp', 0.8).startsWith('data:image/webp') ? c.toDataURL('image/webp', 0.8) : c.toDataURL('image/jpeg', 0.8);
 }

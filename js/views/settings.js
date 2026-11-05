@@ -10,12 +10,13 @@ import { exportJSON, exportExcel, restoreJSON } from '../backup.js';
 import { SYNC, signOut, syncNow, configured } from '../sync.js';
 import { setUI, getUI } from '../theme.js';
 import { schemeFor } from '../gradeutil.js';
+import { DEFAULT_REFERRAL_REASONS, DEFAULT_PARENT_TEMPLATES, SEVERITIES, severityOf } from '../defaults.js';
 import { DAY_NAMES, todayISO, compressImage, fmtDate, fmtDateTime, uuid, fmtNum, GRADE_NAMES } from '../utils.js';
 
 const TABS = [
   { key: 'school', label: 'المدرسة' }, { key: 'calendar', label: 'التقويم' }, { key: 'day', label: 'اليوم الدراسي' },
   { key: 'timetable', label: 'الجدول' }, { key: 'exceptions', label: 'استثناءات الجدول' }, { key: 'events', label: 'أنواع الأحداث' },
-  { key: 'grading', label: 'توزيع الدرجات' }, { key: 'picker', label: 'الاختيار العادل' }, { key: 'display', label: 'المظهر' },
+  { key: 'grading', label: 'توزيع الدرجات' }, { key: 'forms', label: 'النماذج' }, { key: 'picker', label: 'الاختيار العادل' }, { key: 'display', label: 'المظهر' },
   { key: 'account', label: 'الحساب والمزامنة' }, { key: 'backup', label: 'النسخ الاحتياطي' }, { key: 'audit', label: 'سجل التدقيق' },
   { key: 'workspaces', label: 'مساحات العمل' },
 ];
@@ -24,7 +25,7 @@ export function SettingsPage({ tab = 'school' }) {
   useStore();
   const w = workspace();
   if (!w) return null;
-  const T = { school: SchoolTab, calendar: CalendarTab, day: DayTab, timetable: TimetableTab, exceptions: ExceptionsTab, events: EventsTab, grading: GradingTab, picker: PickerTab, display: DisplayTab, account: AccountTab, backup: BackupTab, audit: AuditTab, workspaces: WorkspacesTab }[tab] || SchoolTab;
+  const T = { school: SchoolTab, calendar: CalendarTab, day: DayTab, timetable: TimetableTab, exceptions: ExceptionsTab, events: EventsTab, grading: GradingTab, forms: FormsTab, picker: PickerTab, display: DisplayTab, account: AccountTab, backup: BackupTab, audit: AuditTab, workspaces: WorkspacesTab }[tab] || SchoolTab;
   return html`<div class="page"><div class="page-head"><div><h1>الإعدادات</h1><div class="sub">${w.name} — اللوائح تضبطها أنت؛ لا شيء مفروض في الكود.</div></div></div>
     <${Tabs} active=${tab} onChange=${t => go('#/settings/' + t)} tabs=${TABS} /><${T} w=${w} /></div>`;
 }
@@ -187,6 +188,7 @@ async function typeDialog(w, t = null) {
     { name: 'points', label: 'النقاط', type: 'number', step: '0.25', value: t?.points ?? 1, hint: 'السلبي بقيمة سالبة' },
     { name: 'category', label: 'الفئة التي يؤثر فيها', type: 'select', options: catOptions(w), value: t?.category ?? 'participation' },
     { name: 'cap', label: 'سقف لكل حصة (0 = بلا سقف)', type: 'number', min: 0, value: t?.cap ?? 0, hint: 'لا يُحتسب أكثر من هذا العدد للطالب في الحصة الواحدة' },
+    { name: 'severity', label: 'درجة المشكلة (لنموذج الرصد)', type: 'select', options: SEVERITIES, value: t ? severityOf(t) : 'بسيطة', hint: 'للأنواع السلبية' },
     { name: 'free', label: 'تنبيهات أولى بلا خصم', type: 'number', min: 0, value: t?.free ?? 0, hint: 'أول N مرات في الفصل الدراسي تُسجَّل تنبيهاً' },
     { name: 'visible', label: 'يظهر للطالب في بوابته', type: 'checkbox', value: t?.visible ?? true },
     { name: 'active', label: 'مفعّل', type: 'checkbox', value: t?.active ?? true },
@@ -269,6 +271,29 @@ function GradingTab({ w }) {
         ${['partial', 'late'].map(k => html`<${Field} label=${`قيمة الواجب «${k === 'partial' ? 'ناقص' : 'متأخر'}» من 1`}><input type="number" step="0.05" min="0" max="1" value=${d.options.hw?.[k]} onInput=${e => setD({ ...d, options: { ...d.options, hw: { ...d.options.hw, [k]: +e.target.value } } })} /></${Field}>`)}</div></div>
     </div>
     <div class="row"><${Btn} cls="primary lg" disabled=${!val.ok} onClick=${doSave}><${Icon} name="check" /> حفظ التوزيع</${Btn}>${draft ? html`<button class="btn ghost" onClick=${() => setDraft(null)}>تجاهل التغييرات</button>` : null}</div>
+  </div>`;
+}
+
+// ---------- النماذج ----------
+function FormsTab({ w }) {
+  const reasons = w.options?.referralReasons?.length ? w.options.referralReasons : DEFAULT_REFERRAL_REASONS;
+  const tpls = w.options?.parentTemplates?.length ? w.options.parentTemplates : DEFAULT_PARENT_TEMPLATES;
+  const setOpt = (k, v) => upd(w, { options: { ...w.options, [k]: v } });
+  const addReason = async () => { const v = await formDialog({ title: 'سبب إحالة', fields: [{ name: 'r', label: 'السبب', required: true, full: true }] }); if (v) setOpt('referralReasons', [...reasons, v.r.trim()]); };
+  const editTpl = async (i = null) => {
+    const t = i == null ? { title: '', text: '' } : tpls[i];
+    const v = await formDialog({ title: i == null ? 'قالب رسالة جديد' : 'تعديل القالب', fields: [{ name: 'title', label: 'العنوان', value: t.title, required: true, full: true }, { name: 'text', label: 'النص', type: 'textarea', value: t.text, required: true }] });
+    if (!v) return;
+    setOpt('parentTemplates', i == null ? [...tpls, v] : tpls.map((x, j) => j === i ? v : x));
+  };
+  return html`<div class="grid-2">
+    <div class="card stack"><h2>أسباب الإحالة</h2>
+      <div class="chips">${reasons.map(r => html`<span class="chip">${r} <button class="icon-btn" style="width:22px;height:22px" aria-label="حذف" onClick=${() => setOpt('referralReasons', reasons.filter(x => x !== r))}>×</button></span>`)}</div>
+      <div class="row"><button class="btn sm soft" onClick=${addReason}><${Icon} name="plus" size=${16} /> سبب</button><button class="btn sm ghost" onClick=${() => setOpt('referralReasons', [])}>الافتراضي</button></div>
+      <p class="muted small" style="margin:0">أسماء الوكيل والمرشد والمدير تُؤخذ من «المدرسة».</p></div>
+    <div class="card stack"><h2>قوالب رسالة ولي الأمر</h2>
+      <div class="list">${tpls.map((t, i) => html`<div class="li"><div class="grow"><div class="main-t">${t.title}</div><div class="sub-t">${t.text.slice(0, 90)}${t.text.length > 90 ? '…' : ''}</div></div><button class="icon-btn" onClick=${() => editTpl(i)}><${Icon} name="edit" size=${16} /></button><button class="icon-btn" onClick=${() => setOpt('parentTemplates', tpls.filter((_, j) => j !== i))}><${Icon} name="trash" size=${16} /></button></div>`)}</div>
+      <div class="row"><button class="btn sm soft" onClick=${() => editTpl()}><${Icon} name="plus" size=${16} /> قالب</button><button class="btn sm ghost" onClick=${() => setOpt('parentTemplates', [])}>الافتراضي</button></div></div>
   </div>`;
 }
 

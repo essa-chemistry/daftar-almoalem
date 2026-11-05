@@ -101,7 +101,7 @@ export async function reinstateStudent(studentId, classId, date) {
   await patch('students', studentId, { status: 'active', withdraw_date: null, withdraw_reason: null });
   await audit('إعادة طالب', `${get('students', studentId)?.full_name} من ${date}`);
 }
-const STUDENT_TABLES = ['enrollments', 'notes', 'contacts', 'attendance', 'events', 'picks', 'task_results', 'grade_overrides'];
+const STUDENT_TABLES = ['enrollments', 'notes', 'contacts', 'attendance', 'events', 'picks', 'task_results', 'grade_overrides', 'referrals'];
 export async function mergeStudents(keepId, dupId) {
   const keep = get('students', keepId), dup = get('students', dupId);
   for (const t of STUDENT_TABLES) {
@@ -122,13 +122,13 @@ export async function mergeStudents(keepId, dupId) {
   const changes = {};
   for (const k of ['guardian_phone', 'id_last4', 'seat_no']) if (!keep[k] && dup[k]) changes[k] = dup[k];
   if (Object.keys(changes).length) await patch('students', keepId, changes);
-  await purge('student_private', [dupId]); await purge('student_photos', [dupId]); await purge('students', [dupId]);
+  await purge('student_private', [dupId]); await purge('student_photos', [dupId]); await purge('name_practice', [dupId]); await purge('students', [dupId]);
   await audit('دمج طالب مكرر', `${dup.full_name} ← ${keep.full_name}`);
 }
 export async function purgeStudent(id) {
   const name = get('students', id)?.full_name;
   for (const t of STUDENT_TABLES) await purge(t, all(t, r => r.student_id === id).map(r => r.id).concat([...S.t[t].values()].filter(r => r.deleted && r.student_id === id).map(r => r.id)));
-  await purge('student_private', [id]); await purge('student_photos', [id]); await purge('students', [id]);
+  await purge('student_private', [id]); await purge('student_photos', [id]); await purge('name_practice', [id]); await purge('students', [id]);
   await audit('حذف طالب نهائياً', name);
 }
 

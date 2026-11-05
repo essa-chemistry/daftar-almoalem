@@ -17,6 +17,9 @@ import { TasksPage, TaskPage } from './views/tasks.js';
 import { GradesPage, GradeDetailPage } from './views/grades.js';
 import { PrintPage } from './views/printview.js';
 import { SettingsPage, WorkspaceSetup } from './views/settings.js';
+import { PaperEntryPage } from './views/paper.js';
+import { NamesPage } from './views/names.js';
+import { BehaviorFormPage, ReferralPage, ParentReportPage } from './views/forms.js';
 
 // ---------- التوجيه ----------
 function parseRoute() {
@@ -33,10 +36,10 @@ function useRoute() {
 
 const NAV = [
   { k: 'today', label: 'اليوم', icon: 'today' },
-  { k: 'classes', label: 'الفصول', icon: 'users', also: ['class', 'student', 'import'] },
+  { k: 'classes', label: 'الفصول', icon: 'users', also: ['class', 'student', 'import', 'names'] },
   { k: 'tasks', label: 'المهام', icon: 'tasks', also: ['task'] },
   { k: 'grades', label: 'الدرجات', icon: 'grades', also: ['grade'] },
-  { k: 'print', label: 'الطباعة', icon: 'print' },
+  { k: 'print', label: 'الطباعة والنماذج', icon: 'print', also: ['paper', 'form'] },
   { k: 'settings', label: 'الإعدادات', icon: 'settings' },
 ];
 const NavItems = ({ route }) => NAV.map(n => html`<a href=${'#/' + n.k} class=${'nav-item' + (route.name === n.k || n.also?.includes(route.name) ? ' on' : '')}><${Icon} name=${n.icon} size=${22} /><span>${n.label}</span></a>`);
@@ -93,6 +96,9 @@ function Page({ route }) {
     case 'grade': return html`<${GradeDetailPage} classId=${a[0]} term=${+a[1]} studentId=${a[2]} />`;
     case 'print': return html`<${PrintPage} q=${q} />`;
     case 'settings': return html`<${SettingsPage} tab=${a[0]} />`;
+    case 'paper': return html`<${PaperEntryPage} q=${q} />`;
+    case 'names': return html`<${NamesPage} q=${q} />`;
+    case 'form': return a[0] === 'behavior' ? html`<${BehaviorFormPage} q=${q} />` : a[0] === 'referral' ? html`<${ReferralPage} q=${q} />` : html`<${ParentReportPage} q=${q} />`;
     default: return html`<div class="page"><h1>الصفحة غير موجودة</h1></div>`;
   }
 }
@@ -110,7 +116,7 @@ function App() {
     <div class="main">
       <header class="topbar"><${WsSwitcher} /><span class="today-date">${fmtDateLong(todayISO())}</span><${SyncPill} /><${ThemeBtn} /></header>
       ${SYNC.mode === 'demo' ? html`<div class="demo-bar">وضع تجريبي: البيانات محفوظة على هذا الجهاز فقط ولا تُرفع لأي خادم. لربط التطبيق بحسابك اتبع خطوات README.</div>` : null}
-      <${Guard} key=${route.name + route.args.join('/')}><${Page} route=${route} /></${Guard}>
+      <${Guard} key=${route.name + route.args.join('/') + (route.name === 'form' ? JSON.stringify(route.q) : '')}><${Page} route=${route} /></${Guard}>
     </div>
     <nav class="bottom-nav"><${NavItems} route=${route} /></nav>
   </div><${Guard}><${ModalHost} /></${Guard}><${ToastHost} />`;

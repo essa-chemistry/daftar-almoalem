@@ -4,7 +4,8 @@ import { ws, get, all, roster, classes, className, privateOf, patch, purge, audi
 import { useStore, Icon, Avatar, Btn, Tabs, Empty, go, formDialog, confirmDialog, toast } from '../ui.js';
 import { ensureClass, addStudent, nextSeat, openSession, gradeLabel } from '../ops.js';
 import { pickStats } from '../picker.js';
-import { todayISO, daysBetween, fmtDate, shortName, GRADE_NAMES } from '../utils.js';
+import { todayISO, daysBetween, fmtDate, shortName, GRADE_NAMES, addDays, fmtNum } from '../utils.js';
+import { termRange, currentTerm } from '../calendar.js';
 
 export function ClassesPage() {
   useStore();
@@ -60,6 +61,8 @@ export function ClassPage({ id, tab = 'students' }) {
     <div class="page-head"><a class="icon-btn" href="#/classes"><${Icon} name="back" /></a><div><h1>${className(c)}</h1><div class="sub">${roster(c.id, today).length} طالب نشط</div></div>
       <div class="actions"><button class="btn ghost sm" onClick=${edit}><${Icon} name="edit" size=${16} /> تعديل</button><button class="btn ghost sm" onClick=${del}><${Icon} name="trash" size=${16} /></button>
       <a class="btn" href=${`#/print?class=${c.id}`}><${Icon} name="print" /> كشف المتابعة</a>
+      <a class="btn" href=${`#/paper?class=${c.id}`}><${Icon} name="edit" /> إدخال من الكشف الورقي</a>
+      <a class="btn" href=${`#/names?class=${c.id}`}><${Icon} name="eye" /> اختبر نفسك في الأسماء</a>
       <${Btn} cls="soft" onClick=${async () => { const s = await openSession({ classId: c.id, date: today, period: null, manual: true }); go('#/session/' + s.id); }}><${Icon} name="play" /> حصة يدوية</${Btn}>
       <${Btn} cls="primary" onClick=${add}><${Icon} name="plus" /> طالب</${Btn}></div></div>
     <${Tabs} active=${tab} onChange=${setTab} tabs=${[{ key: 'students', label: 'الطلاب' }, { key: 'seats', label: 'المقاعد' }, { key: 'fair', label: 'لوحة العدالة' }]} />
@@ -100,25 +103,65 @@ function Seats({ c, list }) {
     </div></div>`;
 }
 
+// لوحة العدالة المتقدمة: التغطية، التوازن، توزيع النتائج، تغطية كل حصة
 function Fairness({ c }) {
-  const today = todayISO();
-  const stale = +(workspace()?.options?.picker?.staleDays || 14);
-  const picks = ws('picks', p => p.class_id === c.id);
-  const st = pickStats(picks);
+  const today = todayISO(); const w = workspace();
+  const [range, setRange] = useState('term');
+  const stale = +(w?.options?.picker?.staleDays || 14);
+  const tr = termRange(w, currentTerm(w, today));
+  const from = range === 'term' && tr ? tr.start : range === '30' ? addDays(today, -30) : '0000-01-01';
+  const allPicks = ws('picks', p => p.class_id === c.id);
+  const picks = allPicks.filter(p => p.date >= from);
   const stRow = get('picker_state', c.id);
   const cycle = stRow?.cycle_no || 1;
-  const inCycle = new Set(picks.filter(p => p.consumed && p.cycle_no === cycle).map(p => p.student_id));
-  const rows = roster(c.id, today).map(x => ({ x, s: st.get(x.student.id) || { chances: 0, answers: 0, correct: 0, volunteer: 0, last: null } }))
-    .sort((a, b) => (a.s.last || '').localeCompare(b.s.last || '') || a.s.chances - b.s.chances);
+  const inCycle = new Set(allPicks.filter(p => p.consumed && p.cycle_no === cycle).map(p => p.student_id));
   const owed = new Set(stRow?.owed || []);
-  return html`<div class="card">
-    <div class="row" style="margin-bottom:10px"><b>الدورة الحالية: ${cycle}</b><span class="badge pos">سُئل ${inCycle.size} من ${rows.length}</span><span class="muted small">الأقل سؤالاً والأقدم أولاً. يُميَّز من لم يُسأل منذ ${stale} يوماً.</span></div>
-    <div class="table-wrap"><table class="tbl"><thead><tr><th>الطالب</th><th class="num">الفرص</th><th class="num">أجاب</th><th class="num">صحيحة</th><th class="num">تطوع</th><th>آخر سؤال</th><th>في الدورة</th></tr></thead>
-    <tbody>${rows.map(({ x, s }) => { const days = s.last ? daysBetween(s.last, today) : null; const old = days == null || days >= stale; return html`<tr class="click" onClick=${() => go('#/student/' + x.student.id)}>
-      <td><span class="row" style="flex-wrap:nowrap"><${Avatar} student=${x.student} size=${32} /> ${x.student.full_name}</span></td>
-      <td class="num">${s.chances}</td><td class="num">${s.answers}</td><td class="num">${s.correct}</td><td class="num">${s.volunteer}</td>
-      <td>${s.last ? html`<span class=${old ? 'badge neg' : ''}>${fmtDate(s.last, 'g')} (قبل ${days} يوم)</span>` : html`<span class="badge neg">لم يُسأل بعد</span>`}</td>
-      <td>${inCycle.has(x.student.id) ? html`<span class="badge pos">✓ سُئل</span>` : owed.has(x.student.id) ? html`<span class="badge warn">له دور مؤجل</span>` : html`<span class="badge">ينتظر</span>`}</td></tr>`; })}</tbody></table></div></div>`;
+  const members = roster(c.id, today);
+  const per = new Map(members.map(x => [x.student.id, { chances: 0, correct: 0, partial: 0, wrong: 0, no_answer: 0, volunteer: 0, last: null }]));
+  for (const p of picks) {
+    const o = per.get(p.student_id); if (!o) continue;
+    if (p.volunteer) o.volunteer++; else if (p.consumed) o.chances++; else continue;
+    if (o[p.outcome] != null) o[p.outcome]++;
+    if (!o.last || p.date > o.last) o.last = p.date;
+  }
+  for (const p of allPicks) { const o = per.get(p.student_id); if (o && (!o.lastAll || p.date > o.lastAll)) o.lastAll = p.date; }
+  const vals = [...per.values()].map(o => o.chances);
+  const n = vals.length || 1, mean = vals.reduce((a, b) => a + b, 0) / n;
+  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
+  const sorted = [...vals].sort((a, b) => a - b); const total = sorted.reduce((a, b) => a + b, 0);
+  const gini = total ? sorted.reduce((acc, v, i) => acc + (2 * (i + 1) - n - 1) * v, 0) / (n * total) : 0;
+  const covered = vals.filter(v => v > 0).length;
+  const max = Math.max(1, ...vals);
+  const sessions = ws('sessions', s => s.class_id === c.id && s.date >= from).sort((a, b) => (b.date + (b.period || 0)).localeCompare(a.date + (a.period || 0))).slice(0, 12);
+  const sessCov = sessions.map(s => {
+    const att = all('attendance', a => a.session_id === s.id && a.status.startsWith('absent')).length;
+    const present = Math.max(0, roster(c.id, s.date).length - att);
+    const asked = new Set(allPicks.filter(p => p.session_id === s.id && !p.volunteer).map(p => p.student_id)).size;
+    return { s, present, asked };
+  });
+  const rows = members.map(x => ({ x, o: per.get(x.student.id) })).sort((a, b) => a.o.chances - b.o.chances || (a.o.lastAll || '').localeCompare(b.o.lastAll || ''));
+  const seg = (v, tot, color) => tot ? html`<i style=${`width:${v / tot * 100}%;background:${color}`}></i>` : null;
+  return html`<div class="stack">
+    <div class="row"><div class="chips">${[['term', 'الفصل الدراسي الحالي'], ['30', 'آخر 30 يوماً'], ['all', 'كل السنة']].map(([k, l]) => html`<button class=${'chip' + (range === k ? ' on' : '')} onClick=${() => setRange(k)}>${l}</button>`)}</div></div>
+    <div class="stats">
+      <div class="stat"><b>${covered}/${members.length}</b><span>سُئلوا مرة على الأقل</span></div>
+      <div class="stat"><b>${fmtNum(mean, 1)}</b><span>متوسط الفرص للطالب</span></div>
+      <div class="stat"><b>${vals.length ? Math.min(...vals) : 0}–${vals.length ? Math.max(...vals) : 0}</b><span>أقل وأكثر عدد فرص</span></div>
+      <div class="stat"><b>${Math.round((1 - gini) * 100)}٪</b><span>مؤشر التوازن (100٪ = تساوٍ تام)</span></div>
+      <div class="stat"><b>${cycle}</b><span>الدورة الحالية — سُئل ${inCycle.size} من ${members.length}</span></div>
+    </div>
+    <div class="card"><h2>الطلاب — الأقل فرصاً أولاً</h2>
+      <div class="table-wrap"><table class="tbl nowrap"><thead><tr><th>الطالب</th><th style="min-width:180px">الفرص (الخط = المتوسط)</th><th style="min-width:140px">النتائج</th><th class="num">تطوع</th><th>آخر سؤال</th><th>الدورة</th></tr></thead>
+      <tbody>${rows.map(({ x, o }) => { const days = o.lastAll ? daysBetween(o.lastAll, today) : null; const hi = o.chances > mean + 1.5 * sd && sd > 0; const ans = o.correct + o.partial + o.wrong + o.no_answer; return html`<tr class="click" onClick=${() => go('#/student/' + x.student.id)}>
+        <td><span class="row" style="flex-wrap:nowrap"><${Avatar} student=${x.student} size=${30} /> ${x.student.full_name}</span></td>
+        <td><div class="fbar"><i style=${`width:${o.chances / max * 100}%`}></i><span class="mean" style=${`inset-inline-start:${mean / max * 100}%`}></span></div><span class="small tnum">${o.chances}</span>${hi ? html` <span class="badge warn">يُسأل كثيراً</span>` : null}</td>
+        <td><div class="sbar">${seg(o.correct, ans, 'var(--pos)')}${seg(o.partial, ans, 'var(--warn)')}${seg(o.wrong, ans, 'var(--neg)')}${seg(o.no_answer, ans, 'var(--neu)')}</div><span class="small muted tnum">✓${o.correct} ◐${o.partial} ✗${o.wrong} ⊘${o.no_answer}</span></td>
+        <td class="num">${o.volunteer}</td>
+        <td>${o.lastAll ? html`<span class=${days >= stale ? 'badge neg' : 'small'}>${fmtDate(o.lastAll, 'g')} (قبل ${days} يوم)</span>` : html`<span class="badge neg">لم يُسأل بعد</span>`}</td>
+        <td>${inCycle.has(x.student.id) ? html`<span class="badge pos">✓ سُئل</span>` : owed.has(x.student.id) ? html`<span class="badge warn">دور مؤجل</span>` : html`<span class="badge">ينتظر</span>`}</td></tr>`; })}</tbody></table></div>
+      <div class="row small muted" style="margin-top:8px"><span class="lg-dot" style="background:var(--pos)"></span>صحيحة<span class="lg-dot" style="background:var(--warn)"></span>شبه صحيحة<span class="lg-dot" style="background:var(--neg)"></span>خاطئة<span class="lg-dot" style="background:var(--neu)"></span>لم يجب</div></div>
+    <div class="card"><h2>تغطية آخر الحصص</h2>${sessCov.length ? html`<div class="list">${sessCov.map(({ s, present, asked }) => html`<div class="row"><span class="small tnum" style="min-width:110px">${fmtDate(s.date, 'g')} ${s.period ? 'ح' + s.period : ''}</span><div class="fbar grow"><i style=${`width:${present ? asked / present * 100 : 0}%`}></i></div><span class="small tnum" style="min-width:90px">سُئل ${asked} من ${present}</span></div>`)}</div>` : html`<p class="muted">لا حصص في هذه الفترة.</p>`}</div>
+  </div>`;
 }
 
 export async function addStudentDialog(classId) {

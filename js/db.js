@@ -4,9 +4,11 @@ export const TABLES = [
   'notes', 'contacts', 'timetables', 'exceptions', 'sessions', 'attendance', 'event_types',
   'events', 'picks', 'picker_state', 'tasks', 'task_results', 'grade_schemes',
   'grade_overrides', 'grade_locks', 'audit',
+  // المرحلة 2
+  'referrals', 'name_practice',
 ];
 const DB_NAME = 'daftar-almoalem';
-const VERSION = 1;
+const VERSION = 2; // 2: جداول المرحلة 2 (تُضاف دون مساس بالبيانات)
 let dbp = null;
 
 export function openDB() {

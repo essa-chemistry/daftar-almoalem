@@ -21,7 +21,12 @@ const COLS = {
   picks: ['session_id', 'class_id', 'student_id', 'date'], picker_state: ['class_id'], tasks: ['kind', 'date'],
   task_results: ['task_id', 'student_id'], grade_schemes: ['grade', 'term'],
   grade_overrides: ['class_id', 'student_id', 'term'], grade_locks: ['class_id', 'term'], audit: ['action', 'at'],
+  referrals: ['student_id', 'class_id', 'date', 'status'], name_practice: ['student_id'],
 };
+// جداول تتطلب ملف SQL لاحق: إن لم يُشغَّل بعد نتجاوزها مع رسالة واضحة بدل إيقاف المزامنة كلها
+const NEEDS = { referrals: 'phase2.sql', name_practice: 'phase2.sql' };
+const missingTable = e => /does not exist|Could not find the table|42P01|PGRST205/i.test(`${e?.code || ''} ${e?.message || ''}`);
+let missingSql = new Set();
 const BASE = ['id', 'workspace_id', 'deleted', 'client_updated_at', 'created_at'];
 const SKIP = new Set(['owner_id', 'updated_at', 'server_updated_at']);
 
@@ -86,9 +91,11 @@ export function syncNow() {
   running = (async () => {
     SYNC.busy = true; emit();
     try {
+      missingSql = new Set();
       await push();
       await pull();
-      SYNC.error = null; SYNC.lastSync = new Date().toISOString();
+      SYNC.error = missingSql.size ? `شغّل ${[...missingSql].join(' و')} في Supabase لمزامنة بيانات المرحلة الجديدة` : null;
+      SYNC.lastSync = new Date().toISOString();
     } catch (e) {
       SYNC.error = e.message || String(e);
       console.warn('sync', e);
@@ -111,6 +118,7 @@ async function push() {
       const rows = chunk.map(e => raw(t, e.row_id)).filter(Boolean).map(r => toServer(t, r));
       if (rows.length) {
         const { error } = await sb.from('tr_' + t).upsert(rows, { onConflict: 'id' });
+        if (error && NEEDS[t] && missingTable(error)) { missingSql.add(NEEDS[t]); break; }
         if (error) throw new Error(`تعذر إرسال ${t}: ${error.message}`);
       }
       await db.ackOutbox(chunk);
@@ -123,6 +131,7 @@ async function push() {
     for (let i = 0; i < mine.length; i += 200) {
       const chunk = mine.slice(i, i + 200);
       const { error } = await sb.from('tr_' + t).delete().in('id', chunk.map(e => e.row_id));
+      if (error && NEEDS[t] && missingTable(error)) { missingSql.add(NEEDS[t]); break; }
       if (error) throw new Error(`تعذر الحذف من ${t}: ${error.message}`);
       await db.ackOutbox(chunk);
     }
@@ -149,6 +158,7 @@ async function pull() {
   for (const t of TABLES) {
     for (let from = 0; ; from += 1000) {
       const { data, error } = await sb.from('tr_' + t).select('*').gte('updated_at', since).order('updated_at').range(from, from + 999);
+      if (error && NEEDS[t] && missingTable(error)) { missingSql.add(NEEDS[t]); break; }
       if (error) throw new Error(`تعذر السحب من ${t}: ${error.message}`);
       const rows = data.filter(r => !pendingIds.has(`${t}:${r.id}`)).map(fromServer);
       await mergeRemote(t, rows);
