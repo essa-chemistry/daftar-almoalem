@@ -147,6 +147,25 @@ export async function setAttendance(session, studentId, status, late_minutes = n
 export function addEvent(session, studentId, typeId, extra = {}) {
   return save('events', { session_id: session?.id || null, class_id: session?.class_id || extra.class_id, student_id: studentId, type_id: typeId, date: session?.date || todayISO(), voided: false, ...extra });
 }
+// حذف حصة فُتحت بالخطأ: تُحذف مع حضورها وأحداثها واختياراتها، وتبقى الملاحظات الخاصة بلا ربط
+export function sessionContents(id) {
+  return {
+    attendance: all('attendance', a => a.session_id === id),
+    events: all('events', e => e.session_id === id),
+    picks: all('picks', p => p.session_id === id),
+    notes: all('notes', n => n.session_id === id),
+  };
+}
+export async function deleteSession(id, reason) {
+  const s = get('sessions', id); if (!s) return;
+  const c = sessionContents(id);
+  await purge('attendance', c.attendance.map(r => r.id));
+  await purge('events', c.events.map(r => r.id));
+  await purge('picks', c.picks.map(r => r.id));
+  if (c.notes.length) await saveMany('notes', c.notes.map(n => ({ ...n, session_id: null })));
+  await purge('sessions', [id]);
+  await audit('حذف حصة', `${get('classes', s.class_id)?.name || ''} — ${s.date}${s.period ? ` ح${s.period}` : ''}${s.manual ? ' (يدوية)' : ''}: ${c.events.length} حدث، ${c.attendance.length} حضور`, reason);
+}
 export async function voidEvent(evId, reason) {
   const ev = get('events', evId);
   await patch('events', evId, { voided: true, void_reason: reason, voided_at: new Date().toISOString() });
