@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>اختبارات الدرجات</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root { --ok: #15803d; --bad: #b91c1c; --ink: #0f2742; --muted: #5b6b7d; --line: #dbe4ec; --bg: #f4f8fa; }
+  body { font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: var(--ink); margin: 0; padding: 24px 16px; }
+  main { max-width: 860px; margin: auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 18px; }
+  .sum { display: inline-block; padding: 8px 16px; border-radius: 999px; font-weight: 700; color: #fff; margin-bottom: 16px; }
+  .row { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 12px; align-items: flex-start; }
+  .mark { font-weight: 800; min-width: 54px; }
+  .ok .mark { color: var(--ok); } .bad .mark { color: var(--bad); }
+  code { direction: ltr; display: inline-block; background: #f1f5f9; padding: 1px 6px; border-radius: 6px; font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>اختبارات محرك الدرجات</h1>
+  <p>تتحقق هذه الصفحة من حسابات <code>js/grading.js</code> — نفس الوحدة التي يستخدمها التطبيق.</p>
+  <div id="out">جارٍ التشغيل…</div>
+</main>
+<script type="module">
+  import { runTests } from './js/grading.tests.js';
+  const res = runTests();
+  const ok = res.filter(r => r.ok).length;
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  document.getElementById('out').innerHTML =
+    `<div class="sum" style="background:${ok === res.length ? 'var(--ok)' : 'var(--bad)'}">نجح ${ok} من ${res.length}</div>` +
+    res.map(r => `<div class="row ${r.ok ? 'ok' : 'bad'}"><span class="mark">${r.ok ? '✓ نجح' : '✗ فشل'}</span><div>${esc(r.name)}${r.ok ? '' : `<br><small>الناتج: <code>${esc(JSON.stringify(r.got))}</code> المتوقع: <code>${esc(JSON.stringify(r.want))}</code></small>`}</div></div>`).join('');
+</script>
+</body>
+</html>
