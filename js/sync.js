@@ -22,9 +22,10 @@ const COLS = {
   task_results: ['task_id', 'student_id'], grade_schemes: ['grade', 'term'],
   grade_overrides: ['class_id', 'student_id', 'term'], grade_locks: ['class_id', 'term'], audit: ['action', 'at'],
   referrals: ['student_id', 'class_id', 'date', 'status'], name_practice: ['student_id'],
+  portal_snapshots: ['student_id', 'class_id', 'term'], photo_requests: ['student_id', 'status'], plan_lessons: ['grade', 'term'],
 };
 // جداول تتطلب ملف SQL لاحق: إن لم يُشغَّل بعد نتجاوزها مع رسالة واضحة بدل إيقاف المزامنة كلها
-const NEEDS = { referrals: 'phase2.sql', name_practice: 'phase2.sql' };
+const NEEDS = { referrals: 'phase2.sql', name_practice: 'phase2.sql', portal_snapshots: 'phase3.sql', photo_requests: 'phase3.sql', plan_lessons: 'phase3.sql' };
 const missingTable = e => /does not exist|Could not find the table|42P01|PGRST205/i.test(`${e?.code || ''} ${e?.message || ''}`);
 let missingSql = new Set();
 const BASE = ['id', 'workspace_id', 'deleted', 'client_updated_at', 'created_at'];

@@ -8,7 +8,7 @@ const LABELS = {
   workspaces: 'مساحات العمل', classes: 'الفصول', students: 'الطلاب', enrollments: 'التسجيل', student_private: 'بيانات خاصة',
   student_photos: 'الصور', notes: 'الملاحظات', contacts: 'التواصل', timetables: 'الجداول', exceptions: 'الاستثناءات', sessions: 'الحصص',
   attendance: 'الحضور', event_types: 'أنواع الأحداث', events: 'الأحداث', picks: 'الاختيارات', picker_state: 'حالة الاختيار',
-  tasks: 'المهام', task_results: 'نتائج المهام', grade_schemes: 'توزيع الدرجات', grade_overrides: 'التعديلات اليدوية', grade_locks: 'الاعتماد', audit: 'سجل التدقيق', referrals: 'الإحالات', name_practice: 'تدريب الأسماء',
+  tasks: 'المهام', task_results: 'نتائج المهام', grade_schemes: 'توزيع الدرجات', grade_overrides: 'التعديلات اليدوية', grade_locks: 'الاعتماد', audit: 'سجل التدقيق', referrals: 'الإحالات', name_practice: 'تدريب الأسماء', portal_snapshots: 'لقطات البوابة', photo_requests: 'طلبات الصور', plan_lessons: 'الخطة السنوية',
 };
 
 export function backupData() {

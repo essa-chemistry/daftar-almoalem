@@ -1,10 +1,13 @@
 // شاشة الحصة: الحضور، شبكة الطلاب، الأحداث السريعة، الاختيار العادل، وضع الواجب، الملاحظات
-import { html, useState, useEffect, useRef, useMemo } from '../lib.js';
+import { html, render, useState, useEffect, useRef, useMemo } from '../lib.js';
 import { S, get, ws, all, save, patch, purge, workspace, roster, className, sessionAttendance, sessionEvents, eventTypes, typeBySys, privateOf } from '../store.js';
 import { useStore, Icon, Avatar, Btn, openModal, ModalHead, toast, formDialog, confirmDialog, go, useLongPress, Empty } from '../ui.js';
 import { setAttendance, addEvent, voidEvent, openSession } from '../ops.js';
 import { choose } from '../picker.js';
-import { periodInfo } from '../calendar.js';
+import { periodInfo, termOf } from '../calendar.js';
+import { plannedFor, progress } from '../plan.js';
+import { statusText, statusCls } from './plan.js';
+import { SeatGrid, seatMapOf } from './seatmap.js';
 import { printHTML, sessionSheet } from '../print.js';
 import { todayISO, nowMinutes, parseHM, fmtDateLong, shortName, normAr, fmtNum } from '../utils.js';
 import { HW_STATUS, taskMode } from '../grading.js';
@@ -30,6 +33,7 @@ export function SessionPage({ id }) {
   useStore();
   const d = useSessionData(id);
   const [mode, setMode] = useState('grid'); // grid | attendance | homework
+  const [layout, setLayout] = useState(() => { try { return localStorage.getItem('daftar-layout') || 'grid'; } catch { return 'grid'; } });
   const [q, setQ] = useState('');
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick(x => x + 1), 15000); return () => clearInterval(t); }, []);
@@ -63,6 +67,7 @@ export function SessionPage({ id }) {
       <button class="btn sm ghost" onClick=${() => printHTML(sessionSheet({ classId: s.class_id, date: s.date, period: s.period }))}><${Icon} name="print" size=${16} /> كشف الحصة</button>
       <${Btn} cls="sm deep" onClick=${() => endSession(s.id)}><${Icon} name="stop" size=${16} /> إنهاء الحصة</${Btn}>
     </div>
+    <${PlanBar} s=${s} />
     <div class="sess-bar">
       <button class="btn primary pick-btn" onClick=${() => openPicker(s.id)}><${Icon} name="shuffle" /> اختر طالباً <span class="kbd" style="color:#fff;opacity:.8">مسافة</span></button>
       <button class=${'btn ' + (mode === 'attendance' ? 'deep' : '')} onClick=${() => setMode(mode === 'attendance' ? 'grid' : 'attendance')}><${Icon} name="check" /> الحضور</button>
@@ -78,10 +83,12 @@ export function SessionPage({ id }) {
       <span class="badge pri">أحداث ${evs.length}</span>
       ${mode === 'attendance' ? html`<span class="info small" style="padding:3px 10px">وضع الحضور: كل لمسة تغيّر الحالة (حاضر ← غائب بدون عذر ← بعذر ← متأخر)</span>` : null}
       <span class="grow"></span>
+      ${seatMapOf(cls) ? html`<div class="chips"><button class=${'chip' + (layout === 'grid' ? ' on' : '')} onClick=${() => { setLayout('grid'); try { localStorage.setItem('daftar-layout', 'grid'); } catch { } }}>شبكة</button><button class=${'chip' + (layout === 'seats' ? ' on' : '')} onClick=${() => { setLayout('seats'); try { localStorage.setItem('daftar-layout', 'seats'); } catch { } }}>المقاعد</button></div>` : null}
       <div class="search" style="min-width:180px"><${Icon} name="search" size=${18} /><input placeholder="بحث بالاسم أو الرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
     </div>
     ${mode === 'homework' ? html`<${HomeworkMode} s=${s} list=${list} statusOf=${statusOf} />` : html`
-    <div class="sgrid">${shown.map(x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`)}</div>
+    ${layout === 'seats' && seatMapOf(cls) && !q ? html`<${SeatGrid} c=${cls} list=${list} renderTile=${x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`} />`
+    : html`<div class="sgrid">${shown.map(x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`)}</div>`}
     ${!list.length ? html`<${Empty} icon="users" title="لا يوجد طلاب في هذا الفصل بتاريخ الحصة"><a class="btn soft" href=${'#/class/' + s.class_id}>إدارة الفصل</a></${Empty}>` : null}`}
   </div>`;
 }
@@ -241,7 +248,7 @@ export function openPicker(sessionId, presentMode = false) {
   if (document.querySelector('.picker-open')) return;
   openModal(close => html`<${Picker} sessionId=${sessionId} close=${close} startPresent=${presentMode} />`, { size: 'sm', locked: false });
 }
-function Picker({ sessionId, close, startPresent }) {
+function Picker({ sessionId, close, startPresent, win = null, floating = false }) {
   useStore();
   const d = useSessionData(sessionId);
   const [phase, setPhase] = useState('idle'); // idle | shuffling | picked | volunteer | volAnswer | done
@@ -349,7 +356,8 @@ function Picker({ sessionId, close, startPresent }) {
       if ((e.code === 'Space' || k === 'enter') && ['idle', 'done'].includes(phase)) { e.preventDefault(); return draw(); }
       if (k === 'f' || k === 'ب') setPresent(p => !p);
     };
-    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+    const W = win || window;
+    W.addEventListener('keydown', onKey); return () => W.removeEventListener('keydown', onKey);
   });
   useEffect(() => { draw(); }, []);
 
@@ -365,8 +373,9 @@ function Picker({ sessionId, close, startPresent }) {
     <div class="p-tools"><button class="btn lg" onClick=${() => draw()}><${Icon} name="shuffle" /> اختر</button><button class="btn lg" onClick=${() => { setPresent(false); document.fullscreenElement && document.exitFullscreen?.(); }}>إغلاق العرض</button></div>
   </div>`;
 
-  return html`<div class="picker-open"><${ModalHead} title=${'اختيار عادل — ' + className(cls)} close=${close}>
-      <button class="icon-btn" title="وضع العرض أمام الطلاب (F)" onClick=${() => { setPresent(true); document.documentElement.requestFullscreen?.().catch(() => {}); }}><${Icon} name="screen" /></button></${ModalHead}>
+  return html`<div class=${'picker-open' + (floating ? ' floating-picker' : '')}><${ModalHead} title=${(floating ? '' : 'اختيار عادل — ') + className(cls)} close=${close}>
+      ${!floating ? html`<button class="icon-btn" title="نافذة عائمة فوق شاشة الدرس" onClick=${async () => { if (await openFloatingPicker(s.id)) close(); }}><${Icon} name="pip" /></button>
+      <button class="icon-btn" title="وضع العرض أمام الطلاب (F)" onClick=${() => { setPresent(true); document.documentElement.requestFullscreen?.().catch(() => {}); }}><${Icon} name="screen" /></button>` : null}</${ModalHead}>
     <div class="modal-body picker">
       ${phase === 'volunteer' ? html`<div><h4 style="margin-bottom:10px">من أجاب؟</h4><div class="sgrid" style="grid-template-columns:repeat(auto-fill,minmax(96px,1fr))">${candidates.map(id => html`<div class="stile" onClick=${() => { setVol(id); setPhase('volAnswer'); }}><${Avatar} student=${stu(id)} size=${46} /><span class="nm small">${shortName(stu(id).full_name)}</span></div>`)}</div><button class="btn ghost block" style="margin-top:10px" onClick=${() => setPhase('picked')}>رجوع</button></div>` : card}
       ${phase === 'picked' && cur ? html`
@@ -387,3 +396,43 @@ function Picker({ sessionId, close, startPresent }) {
     </div></div>`;
 }
 export { openSession };
+
+// ---------- النافذة العائمة (Document Picture-in-Picture أو نافذة صغيرة مستقلة) ----------
+export async function openFloatingPicker(sessionId) {
+  let win = null;
+  try { if (window.documentPictureInPicture) win = await window.documentPictureInPicture.requestWindow({ width: 380, height: 620 }); } catch { win = null; }
+  if (!win) win = window.open('', 'daftar-picker', 'popup,width=400,height=660');
+  if (!win) { toast('تعذر فتح النافذة العائمة — اسمح بالنوافذ المنبثقة لهذا الموقع', 'warn', 5000); return false; }
+  const d = win.document;
+  d.documentElement.lang = 'ar'; d.documentElement.dir = 'rtl';
+  const th = document.documentElement.dataset.theme; if (th) d.documentElement.dataset.theme = th;
+  d.documentElement.style.cssText = document.documentElement.style.cssText;
+  d.title = 'اختيار عادل — دفتر المعلم';
+  d.head.querySelectorAll('link,style').forEach(n => n.remove());
+  for (const n of document.querySelectorAll('link[rel=stylesheet], style')) { const c = n.cloneNode(true); if (n.href) c.href = n.href; d.head.appendChild(c); }
+  d.body.innerHTML = ''; d.body.className = 'floating';
+  const root = d.createElement('div'); d.body.appendChild(root);
+  render(html`<${Picker} sessionId=${sessionId} close=${() => win.close()} win=${win} floating=${true} />`, root);
+  win.addEventListener('pagehide', () => render(null, root));
+  win.focus?.();
+  return true;
+}
+
+// ---------- الخطة: الدرس المخطط لهذه الحصة وزر «تم الشرح» ----------
+function PlanBar({ s }) {
+  const w = workspace(); const term = termOf(w, s.date);
+  if (!term) return null;
+  const prog = progress(s.class_id, term);
+  if (!prog.total) return null;
+  const planned = s.period ? plannedFor(s.class_id, term, s.date, s.period) : null;
+  const n = Math.max(1, +s.plan_units || 1);
+  const toggle = () => patch('sessions', s.id, { plan_done: !s.plan_done, plan_units: n, plan_lesson_id: !s.plan_done ? prog.next?.lesson.id || null : null });
+  return html`<div class="plan-bar">
+    <span>📘 المخطط لهذه الحصة: <b>${planned ? planned.lesson.title : '—'}</b>${planned && planned.of > 1 ? html` <span class="muted small">(${planned.k}/${planned.of})</span>` : null}</span>
+    ${prog.next && (!planned || prog.next.lesson.id !== planned.lesson.id) ? html`<span>التالي فعلياً: <b>${prog.next.lesson.title}</b></span>` : null}
+    <span class=${'badge ' + statusCls(prog)}>${statusText(prog)}</span>
+    <span class="grow"></span>
+    ${s.plan_done ? html`<select style="width:auto;min-height:36px" value=${n} onChange=${e => patch('sessions', s.id, { plan_units: +e.target.value })}>${[1, 2, 3].map(k => html`<option value=${k}>${k === 1 ? 'حصة واحدة' : k + ' حصص من الخطة'}</option>`)}</select>` : null}
+    <button class=${'btn sm ' + (s.plan_done ? 'primary' : 'soft')} onClick=${toggle}>${s.plan_done ? '✓ تم الشرح' : 'تم الشرح'}</button>
+  </div>`;
+}

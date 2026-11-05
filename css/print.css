@@ -65,3 +65,17 @@ table.pr.pr-beh td.nm2 { text-align: right; padding-inline-start: 4px; }
 .paper { background: #fff; color: #000; border-radius: 6px; box-shadow: var(--sh); padding: 14mm 12mm; width: 210mm; max-width: 100%; margin: 0 auto; font-family: 'Tajawal', sans-serif; direction: rtl; }
 .paper .pr-page + .pr-page { margin-top: 18mm; border-top: 2px dashed #bbb; padding-top: 12mm; }
 .paper-wrap { overflow: auto; padding: 4px; }
+
+/* ---------- المرحلة 3: قصاصات رموز البوابة ---------- */
+.slips { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 6mm; margin-top: 4mm; }
+.slip { border: 1.5px dashed #555; border-radius: 4mm; padding: 4mm; display: grid; grid-template-columns: 1fr 26mm; gap: 3mm; align-items: center; height: 46mm; font-size: 9.5pt; line-height: 1.6; }
+.slip-code { font-size: 20pt; font-weight: 800; letter-spacing: 4px; direction: ltr; text-align: right; }
+.slip-qr svg { width: 26mm; height: 26mm; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+/* خريطة المقاعد المطبوعة */
+.seat-print { display: grid; gap: 3mm; margin-top: 4mm; }
+.seat-print .sp { border: 1px solid #333; border-radius: 3mm; min-height: 22mm; padding: 2mm; text-align: center; font-size: 9pt; display: grid; place-items: center; }
+.seat-print .sp img { width: 13mm; height: 13mm; border-radius: 50%; object-fit: cover; }
+.seat-print .sp.aisle { border: 0; }
+.seat-print .sp b { display: block; }
+.seat-board { text-align: center; border: 2px solid #12355b; border-radius: 3mm; padding: 2mm; font-weight: 800; margin-top: 4mm; }

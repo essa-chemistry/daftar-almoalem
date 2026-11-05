@@ -19,6 +19,9 @@ import { PrintPage } from './views/printview.js';
 import { SettingsPage, WorkspaceSetup } from './views/settings.js';
 import { PaperEntryPage } from './views/paper.js';
 import { NamesPage } from './views/names.js';
+import { PlanPage } from './views/plan.js';
+import { PortalPage } from './views/portal.js';
+import { publishSnapshots } from './portal.js';
 import { BehaviorFormPage, ReferralPage, ParentReportPage } from './views/forms.js';
 
 // ---------- التوجيه ----------
@@ -36,9 +39,10 @@ function useRoute() {
 
 const NAV = [
   { k: 'today', label: 'اليوم', icon: 'today' },
-  { k: 'classes', label: 'الفصول', icon: 'users', also: ['class', 'student', 'import', 'names'] },
+  { k: 'classes', label: 'الفصول', icon: 'users', also: ['class', 'student', 'import', 'names', 'portal'] },
   { k: 'tasks', label: 'المهام', icon: 'tasks', also: ['task'] },
   { k: 'grades', label: 'الدرجات', icon: 'grades', also: ['grade'] },
+  { k: 'plan', label: 'الخطة', icon: 'book' },
   { k: 'print', label: 'الطباعة والنماذج', icon: 'print', also: ['paper', 'form'] },
   { k: 'settings', label: 'الإعدادات', icon: 'settings' },
 ];
@@ -98,6 +102,8 @@ function Page({ route }) {
     case 'settings': return html`<${SettingsPage} tab=${a[0]} />`;
     case 'paper': return html`<${PaperEntryPage} q=${q} />`;
     case 'names': return html`<${NamesPage} q=${q} />`;
+    case 'plan': return html`<${PlanPage} />`;
+    case 'portal': return html`<${PortalPage} q=${q} />`;
     case 'form': return a[0] === 'behavior' ? html`<${BehaviorFormPage} q=${q} />` : a[0] === 'referral' ? html`<${ReferralPage} q=${q} />` : html`<${ParentReportPage} q=${q} />`;
     default: return html`<div class="page"><h1>الصفحة غير موجودة</h1></div>`;
   }
@@ -172,6 +178,8 @@ async function boot() {
     const saved = localStorage.getItem('daftar-ws');
     setWorkspace(saved && get('workspaces', saved) ? saved : (all('workspaces').find(w => !w.archived)?.id || null));
     render(html`<${App} />`, root);
+    // نشر لقطات الدرجات للبوابة دورياً (عند تفعيلها وفي الوضع المتصل فقط)
+    if (SYNC.mode === 'cloud') { const pub = () => { if (workspace()?.portal?.enabled && SYNC.user && navigator.onLine) publishSnapshots().catch(() => {}); }; setTimeout(pub, 20000); setInterval(pub, 5 * 60000); }
     if (SYNC.mode === 'cloud' && SYNC.user) syncNow().then(() => { if (!S.wsId) { setWorkspace(all('workspaces').find(w => !w.archived)?.id || null); emit(); } });
   } catch (e) {
     console.error(e);

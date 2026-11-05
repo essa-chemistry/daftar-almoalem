@@ -44,6 +44,7 @@ export function GradesPage({ q = {} }) {
     if (!await confirmDialog({ title: 'اعتماد درجات الفصل', message: `سيُقفل الفصل بلقطة محفوظة لدرجات ${rows.length} طالب.${msg}`, okText: 'اعتماد' })) return;
     const snapshot = { scheme: scheme.categories.map(c => ({ key: c.key, name: c.name, weight: c.weight })), students: rows.map(x => ({ student_id: x.student.id, name: x.student.full_name, seat_no: x.student.seat_no, categories: x.g.categories.map(c => ({ key: c.key, name: c.name, weight: c.weight, suggested: c.suggested, final: c.final, override: c.override ? c.override.reason : null, text: c.text })), total: x.g.total, monthly: x.g.monthly.final, grand: x.g.grand })) };
     await save('grade_locks', { class_id: c.id, term, active: true, snapshot, locked_at: new Date().toISOString(), by: S.user || 'المعلم' });
+    if (workspace()?.portal?.enabled) import('../portal.js').then(m => m.publishSnapshots()).catch(() => {});
     await audit('اعتماد درجات الفصل', `${className(c)} — الفصل الدراسي ${term}`);
     toast('اعتُمدت الدرجات وحُفظت اللقطة', 'ok');
   };

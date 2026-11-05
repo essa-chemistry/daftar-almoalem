@@ -405,3 +405,22 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: .92rem; }
 .paper-grid td.pcell input.good { background: var(--pos-bg); border-color: var(--pos); }
 .paper-grid td.pcell input.bad { background: var(--neg-bg); border-color: var(--neg); }
 .paper-grid .rec { position: absolute; top: 1px; inset-inline-end: 3px; font-size: .66rem; color: var(--muted); font-weight: 700; }
+
+/* ---------- المرحلة 3 ---------- */
+.plan-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 12px; font-size: .94rem; }
+.seat-board { text-align: center; border: 2px solid var(--deep); color: var(--deep); border-radius: 12px; padding: 6px; font-weight: 800; margin-bottom: 10px; }
+:root[data-theme="dark"] .seat-board { color: var(--ink); border-color: var(--line); }
+.seat-grid { display: grid; gap: 8px; }
+.seatcell { min-height: 92px; border: 1.5px dashed var(--line); border-radius: 14px; display: grid; justify-items: center; align-content: center; gap: 4px; padding: 6px 2px; cursor: pointer; background: var(--surface-2); text-align: center; user-select: none; }
+.seatcell.taken { border-style: solid; background: var(--surface); }
+.seatcell.sel { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.seatcell.aisle, .seat-empty.aisle { background: repeating-linear-gradient(-45deg, transparent, transparent 6px, var(--bg-2) 6px, var(--bg-2) 12px); border-color: transparent; }
+.seatcell .nm { font-size: .8rem; font-weight: 700; line-height: 1.2; }
+.seat-grid.live .stile { padding: 10px 4px 8px; }
+.seat-empty { min-height: 60px; border-radius: 14px; border: 1.5px dashed var(--line); opacity: .5; }
+body.floating { background: var(--surface); }
+.floating-picker { min-height: 100vh; display: flex; flex-direction: column; }
+.floating-picker .modal-body { flex: 1; }
+.floating-picker .picker .pname { font-size: 1.6rem; }
+.floating-picker .outcomes .btn { min-height: 56px; }
+@media (max-width: 640px) { .seatcell { min-height: 76px; } }

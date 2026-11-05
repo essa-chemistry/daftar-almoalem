@@ -33,7 +33,7 @@ const P = {
   note: 'M5 4h10l4 4v12H5zM14 4v5h5M8 13h8M8 17h5', clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
   file: 'M6 3h8l5 5v13H6zM14 3v5h5', archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4', swap: 'M7 4l-4 4 4 4M3 8h14M17 20l4-4-4-4M21 16H7',
   heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z', phone: 'M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z',
-  menu: 'M4 6h16M4 12h16M4 18h16', moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  menu: 'M4 6h16M4 12h16M4 18h16', pip: 'M3 5h18v14H3zM12 12h7v5h-7z', book: 'M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5zM4 19.5A1.5 1.5 0 0 0 5.5 21H20M8 7h8M8 11h6', moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
 };
 export const Icon = ({ name, size = 20, cls = '' }) => html`<svg class=${'ic ' + cls} width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d=${P[name] || P.hex} /></svg>`;
 

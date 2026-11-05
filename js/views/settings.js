@@ -10,13 +10,14 @@ import { exportJSON, exportExcel, restoreJSON } from '../backup.js';
 import { SYNC, signOut, syncNow, configured } from '../sync.js';
 import { setUI, getUI } from '../theme.js';
 import { schemeFor } from '../gradeutil.js';
+import { PortalSettings } from './portal.js';
 import { DEFAULT_REFERRAL_REASONS, DEFAULT_PARENT_TEMPLATES, SEVERITIES, severityOf } from '../defaults.js';
 import { DAY_NAMES, todayISO, compressImage, fmtDate, fmtDateTime, uuid, fmtNum, GRADE_NAMES } from '../utils.js';
 
 const TABS = [
   { key: 'school', label: 'المدرسة' }, { key: 'calendar', label: 'التقويم' }, { key: 'day', label: 'اليوم الدراسي' },
   { key: 'timetable', label: 'الجدول' }, { key: 'exceptions', label: 'استثناءات الجدول' }, { key: 'events', label: 'أنواع الأحداث' },
-  { key: 'grading', label: 'توزيع الدرجات' }, { key: 'forms', label: 'النماذج' }, { key: 'picker', label: 'الاختيار العادل' }, { key: 'display', label: 'المظهر' },
+  { key: 'grading', label: 'توزيع الدرجات' }, { key: 'forms', label: 'النماذج' }, { key: 'portal', label: 'بوابة الطالب' }, { key: 'picker', label: 'الاختيار العادل' }, { key: 'display', label: 'المظهر' },
   { key: 'account', label: 'الحساب والمزامنة' }, { key: 'backup', label: 'النسخ الاحتياطي' }, { key: 'audit', label: 'سجل التدقيق' },
   { key: 'workspaces', label: 'مساحات العمل' },
 ];
@@ -25,7 +26,7 @@ export function SettingsPage({ tab = 'school' }) {
   useStore();
   const w = workspace();
   if (!w) return null;
-  const T = { school: SchoolTab, calendar: CalendarTab, day: DayTab, timetable: TimetableTab, exceptions: ExceptionsTab, events: EventsTab, grading: GradingTab, forms: FormsTab, picker: PickerTab, display: DisplayTab, account: AccountTab, backup: BackupTab, audit: AuditTab, workspaces: WorkspacesTab }[tab] || SchoolTab;
+  const T = { school: SchoolTab, calendar: CalendarTab, day: DayTab, timetable: TimetableTab, exceptions: ExceptionsTab, events: EventsTab, grading: GradingTab, forms: FormsTab, portal: PortalSettings, picker: PickerTab, display: DisplayTab, account: AccountTab, backup: BackupTab, audit: AuditTab, workspaces: WorkspacesTab }[tab] || SchoolTab;
   return html`<div class="page"><div class="page-head"><div><h1>الإعدادات</h1><div class="sub">${w.name} — اللوائح تضبطها أنت؛ لا شيء مفروض في الكود.</div></div></div>
     <${Tabs} active=${tab} onChange=${t => go('#/settings/' + t)} tabs=${TABS} /><${T} w=${w} /></div>`;
 }
@@ -191,6 +192,7 @@ async function typeDialog(w, t = null) {
     { name: 'severity', label: 'درجة المشكلة (لنموذج الرصد)', type: 'select', options: SEVERITIES, value: t ? severityOf(t) : 'بسيطة', hint: 'للأنواع السلبية' },
     { name: 'free', label: 'تنبيهات أولى بلا خصم', type: 'number', min: 0, value: t?.free ?? 0, hint: 'أول N مرات في الفصل الدراسي تُسجَّل تنبيهاً' },
     { name: 'visible', label: 'يظهر للطالب في بوابته', type: 'checkbox', value: t?.visible ?? true },
+    { name: 'portal_group', label: 'يُعرض في البوابة ضمن', type: 'select', options: [{ value: '', label: 'تلقائي حسب النوع' }, { value: 'participation', label: 'المشاركة' }, { value: 'behavior', label: 'السلوك' }, { value: 'sleep', label: 'النوم في الحصة' }, { value: 'other', label: 'لا يُعرض' }], value: t?.portal_group || '' },
     { name: 'active', label: 'مفعّل', type: 'checkbox', value: t?.active ?? true },
   ] });
   if (!v) return;

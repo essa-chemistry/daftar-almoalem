@@ -1,7 +1,8 @@
 // الرئيسية «اليوم»: حصص اليوم من الجدول + تنبيهات
 import { html, useEffect, useState } from '../lib.js';
 import { workspace, calCtx, get, ws, all, findSession, className, classes, roster, S } from '../store.js';
-import { meetingsOn, periodInfo, periodAt, isHeldStatus, isWorkday, holidayOn, EXC_KINDS } from '../calendar.js';
+import { meetingsOn, periodInfo, periodAt, isHeldStatus, isWorkday, holidayOn, EXC_KINDS, termOf } from '../calendar.js';
+import { progress } from '../plan.js';
 import { useStore, Icon, Btn, Empty, go, formDialog, toast } from '../ui.js';
 import { openSession } from '../ops.js';
 import { pickStats } from '../picker.js';
@@ -59,6 +60,10 @@ export function TodayPage() {
   for (const n of reminders) alerts.push({ icon: 'note', text: html`تذكير: ${n.text}${n.student_id ? html` — <b>${get('students', n.student_id)?.full_name || ''}</b>` : ''}`, href: n.student_id ? `#/student/${n.student_id}?tab=notes` : null });
   for (const r of ws('referrals', r => r.status !== 'resolved' && r.date <= addDays(today, -2)))
     alerts.push({ icon: 'file', warn: true, text: html`إحالة بانتظار الرد منذ ${fmtDate(r.date, 'g')}: <b>${get('students', r.student_id)?.full_name || ''}</b> — ${{ sent: 'أُرسلت', received: 'استُلمت' }[r.status] || ''}`, href: '#/form/referral?id=' + r.id });
+  const photoReq = ws('photo_requests', r => r.status === 'pending').length;
+  if (photoReq) alerts.push({ icon: 'users', text: html`${photoReq} صورة طالب بانتظار اعتمادك`, href: '#/portal?tab=photos' });
+  const tNow = termOf(w, today);
+  if (tNow) for (const c of classes()) { const p = progress(c.id, tNow); if (p.total && p.diff <= -2) alerts.push({ icon: 'book', warn: true, text: html`${className(c)} متأخر ${-p.diff} حصة عن الخطة — التالي: <b>${p.next?.lesson.title || ''}</b>`, href: '#/plan' }); }
   const lastBackup = localStorage.getItem('daftar-last-backup');
   const needBackup = !lastBackup || daysBetween(lastBackup.slice(0, 10), today) >= 7;
 

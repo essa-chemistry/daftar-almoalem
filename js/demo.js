@@ -141,6 +141,23 @@ export async function seedDemo() {
     { student_id: sB[1].id, class_id: B.id, date: addDays(today, -4), period: 3, subject: 'كيمياء', to_role: 'counselor', reasons: ['تكرار التأخر'], description: 'تأخر متكرر عن بداية الحصة رغم التنبيه.', severity: 'متوسطة', prior: ['تنبيه الطالب شفهياً', 'تواصل مع ولي الأمر (اتصال)'], requested: 'الاطلاع واتخاذ الإجراء المناسب وإفادتنا بالنتيجة.', status: 'received', history: [{ status: 'sent', date: addDays(today, -4) }, { status: 'received', date: addDays(today, -3) }] },
     { student_id: sA[2].id, class_id: A.id, date: addDays(today, -20), period: 2, subject: 'كيمياء', to_role: 'deputy', reasons: ['النوم المتكرر في الحصة'], description: '', severity: 'بسيطة', prior: [], requested: 'الاطلاع.', status: 'resolved', response: 'استجاب', outcome: 'تم توجيه الطالب والتواصل مع ولي أمره', history: [] },
   ]);
+  // المرحلة 3: خطة سنوية للصفين، خريطة مقاعد، وتقدّم في الشرح
+  const planA = [['المادة وتصنيفها', 'المادة والطاقة', 2], ['المادة وتصنيفها', 'الخواص والتغيرات', 2], ['المادة وتصنيفها', 'المخاليط والعناصر والمركبات', 3], ['بناء الذرة', 'النماذج الذرية', 2], ['بناء الذرة', 'تركيب الذرة', 3], ['بناء الذرة', 'النظائر والكتلة الذرية', 2], ['الجدول الدوري', 'تطور الجدول الدوري', 2], ['الجدول الدوري', 'تصنيف العناصر', 3], ['الجدول الدوري', 'التدرج في الخواص', 3], ['المركبات الأيونية', 'تكوين الأيونات', 2], ['المركبات الأيونية', 'الروابط الأيونية', 3], ['المركبات الأيونية', 'الفلزات وروابطها', 2], ['مراجعة', 'مراجعة عامة', 3]];
+  const planB = [['المول', 'قياس المادة', 3], ['المول', 'الكتلة والمول', 4], ['المول', 'مولات المركبات', 4], ['المول', 'الصيغة الأولية والجزيئية', 4], ['المول', 'صيغ الأملاح المائية', 2], ['الحسابات الكيميائية', 'المقصود بالحسابات الكيميائية', 3], ['الحسابات الكيميائية', 'حسابات المعادلات', 5], ['الحسابات الكيميائية', 'المادة المحددة للتفاعل', 4], ['الحسابات الكيميائية', 'نسبة المردود المئوية', 4], ['الغازات', 'قوانين الغازات', 5], ['الغازات', 'قانون الغاز المثالي', 5], ['مراجعة', 'مراجعة واختبارات', 6]];
+  await saveMany('plan_lessons', [
+    ...planA.map(([unit, title, periods], i) => ({ grade: 1, term: 1, unit, title, periods, order: i })),
+    ...planB.map(([unit, title, periods], i) => ({ grade: 2, term: 1, unit, title, periods, order: i })),
+  ]);
+  // تقدّم الشرح: الشعبة الأولى وفق الخطة تقريباً، والثانية متأخرة قليلاً
+  const doneRows = [];
+  for (const [cls, keepEvery] of [[A, 1], [B, 1.25]]) {
+    const ss = sessions.filter(x => x.class_id === cls.id).sort((a, b) => a.date.localeCompare(b.date));
+    let acc = 0; for (const x of ss) { acc += 1 / keepEvery; if (acc >= 1) { acc -= 1; doneRows.push({ ...x, plan_done: true, plan_units: 1 }); } }
+  }
+  await saveMany('sessions', doneRows);
+  const cellsA = {}; sA.forEach((st, i) => { cellsA[`${Math.floor(i / 3)}-${(i % 3) + (i % 3 >= 1 ? 1 : 0)}`] = st.id; });
+  cellsA['0-1'] = 'x'; cellsA['1-1'] = 'x';
+  await save('classes', { ...A, seat_map: { rows: 2, cols: 4, cells: cellsA } });
   if (typeof document !== 'undefined') {
     const photos = [...sA, ...sB].map((s, i) => ({ id: s.id, student_id: s.id, data: demoPortrait(i), status: 'approved', source: 'demo' }));
     await saveMany('student_photos', photos);

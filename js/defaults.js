@@ -18,7 +18,7 @@ export function defaultEventTypes() {
     { name: 'إجابة خاطئة', code: 'خ', icon: '✗', color: '#64748b', valence: 'neu', points: 0, category: 'participation', sys: 'answer_wrong' },
     { name: 'لم يجب', code: 'م', icon: '⊘', color: '#64748b', valence: 'neu', points: 0, category: 'participation', sys: 'no_answer' },
     { name: 'ملاحظة', code: 'ح', icon: '✎', color: '#64748b', valence: 'neu', points: 0, category: '', visible: false },
-    { name: 'نوم في الحصة', code: 'ن', icon: '😴', color: '#dc2626', valence: 'neg', points: -1, category: 'behavior', cap: 1 },
+    { name: 'نوم في الحصة', code: 'ن', icon: '😴', color: '#dc2626', valence: 'neg', points: -1, category: 'behavior', cap: 1, portal_group: 'sleep' },
     { name: 'تأخر عن الدخول', code: 'ت', icon: '⏰', color: '#ea580c', valence: 'neg', points: -0.5, category: 'behavior', cap: 1, sys: 'late' },
     { name: 'غياب بدون عذر', code: 'غ', icon: '⛔', color: '#b91c1c', valence: 'neg', points: -1, category: 'behavior', cap: 1, sys: 'absent_unexcused' },
     { name: 'غياب بعذر', code: 'ع', icon: '📄', color: '#64748b', valence: 'neu', points: 0, category: '', cap: 1, sys: 'absent_excused' },

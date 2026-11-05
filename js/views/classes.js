@@ -6,6 +6,7 @@ import { ensureClass, addStudent, nextSeat, openSession, gradeLabel } from '../o
 import { pickStats } from '../picker.js';
 import { todayISO, daysBetween, fmtDate, shortName, GRADE_NAMES, addDays, fmtNum } from '../utils.js';
 import { termRange, currentTerm } from '../calendar.js';
+import { SeatEditor } from './seatmap.js';
 
 export function ClassesPage() {
   useStore();
@@ -21,7 +22,7 @@ export function ClassesPage() {
   };
   return html`<div class="page">
     <div class="page-head"><div><h1>الفصول والطلاب</h1><div class="sub">${cls.length} فصل • ${new Set(cls.flatMap(c => roster(c.id, today).map(x => x.student.id))).size} طالب نشط</div></div>
-      <div class="actions"><a class="btn soft" href="#/import"><${Icon} name="upload" /> استيراد من Excel</a><${Btn} cls="primary" onClick=${addClass}><${Icon} name="plus" /> فصل جديد</${Btn}></div></div>
+      <div class="actions"><a class="btn" href="#/portal"><${Icon} name="users" /> بوابة الطالب</a><a class="btn soft" href="#/import"><${Icon} name="upload" /> استيراد من Excel</a><${Btn} cls="primary" onClick=${addClass}><${Icon} name="plus" /> فصل جديد</${Btn}></div></div>
     ${cls.length ? html`<div class="grid-3">${cls.map(c => {
       const r = roster(c.id, today);
       return html`<div class="card li click" style="display:grid;gap:10px" onClick=${() => go('#/class/' + c.id)}>
@@ -65,7 +66,7 @@ export function ClassPage({ id, tab = 'students' }) {
       <a class="btn" href=${`#/names?class=${c.id}`}><${Icon} name="eye" /> اختبر نفسك في الأسماء</a>
       <${Btn} cls="soft" onClick=${async () => { const s = await openSession({ classId: c.id, date: today, period: null, manual: true }); go('#/session/' + s.id); }}><${Icon} name="play" /> حصة يدوية</${Btn}>
       <${Btn} cls="primary" onClick=${add}><${Icon} name="plus" /> طالب</${Btn}></div></div>
-    <${Tabs} active=${tab} onChange=${setTab} tabs=${[{ key: 'students', label: 'الطلاب' }, { key: 'seats', label: 'المقاعد' }, { key: 'fair', label: 'لوحة العدالة' }]} />
+    <${Tabs} active=${tab} onChange=${setTab} tabs=${[{ key: 'students', label: 'الطلاب' }, { key: 'seats', label: 'خريطة المقاعد' }, { key: 'fair', label: 'لوحة العدالة' }]} />
     ${tab === 'students' ? html`
       <div class="row" style="margin-bottom:12px"><div class="search grow" style="max-width:420px"><${Icon} name="search" size=${18} /><input placeholder="ابحث بجزء من الاسم أو بالرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
         <label class="check small"><input type="checkbox" checked=${showLeft} onChange=${e => setShowLeft(e.target.checked)} /> إظهار المنسحبين والمنقولين</label></div>
@@ -76,31 +77,9 @@ export function ClassPage({ id, tab = 'students' }) {
           <${Avatar} student=${x.student} size=${62} health=${true} /><span class="nm">${x.student.full_name}</span>
           <span class="marks">${(pv.tags || []).slice(0, 2).map(t => html`<span class="badge pri">${t}</span>`)}</span></div>`;
       })}</div>` : html`<${Empty} icon="users" title=${q ? 'لا نتائج' : 'لا يوجد طلاب'}>${!q ? html`<button class="btn primary" onClick=${add}>إضافة طالب</button>` : null}</${Empty}>`}` : null}
-    ${tab === 'seats' ? html`<${Seats} c=${c} list=${roster(c.id, today)} />` : null}
+    ${tab === 'seats' ? html`<${SeatEditor} c=${c} />` : null}
     ${tab === 'fair' ? html`<${Fairness} c=${c} />` : null}
   </div>`;
-}
-
-function Seats({ c, list }) {
-  const [cols, setCols] = useState(c.seat_cols || 6);
-  const max = Math.max(list.length, ...list.map(x => +x.student.seat_no || 0));
-  const bySeat = new Map(list.map(x => [+x.student.seat_no, x]));
-  const change = async x => {
-    const v = await formDialog({ title: `رقم مقعد ${x.student.full_name}`, fields: [{ name: 'n', label: 'الرقم', type: 'number', value: x.student.seat_no, required: true }] });
-    if (!v) return;
-    const other = bySeat.get(+v.n);
-    if (other && other.student.id !== x.student.id) await patch('students', other.student.id, { seat_no: x.student.seat_no });
-    await patch('students', x.student.id, { seat_no: +v.n });
-  };
-  return html`<div class="card">
-    <div class="row" style="margin-bottom:12px"><span class="muted">عرض مبسّط مرتب بالرقم — اضغط طالباً لتغيير رقمه (يُبدَّل مع صاحب الرقم).</span><span class="grow"></span>
-      <label class="row small">أعمدة <input type="number" min="2" max="10" style="width:70px" value=${cols} onChange=${e => { setCols(+e.target.value); patch('classes', c.id, { seat_cols: +e.target.value }); }} /></label></div>
-    <div style="text-align:center;margin-bottom:10px"><span class="badge pri">السبورة</span></div>
-    <div style=${`display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:8px`}>
-      ${Array.from({ length: Math.ceil(max / cols) * cols }, (_, i) => { const x = bySeat.get(i + 1); return x
-        ? html`<div class="stile" style="padding:8px 4px" onClick=${() => change(x)}><span class="seat">${i + 1}</span><${Avatar} student=${x.student} size=${38} /><span class="nm small">${shortName(x.student.full_name)}</span></div>`
-        : html`<div class="stile" style="opacity:.35;padding:8px 4px;cursor:default"><span class="seat">${i + 1}</span><span class="small muted" style="margin-top:22px">فارغ</span></div>`; })}
-    </div></div>`;
 }
 
 // لوحة العدالة المتقدمة: التغطية، التوازن، توزيع النتائج، تغطية كل حصة
