@@ -153,7 +153,8 @@ async function push() {
 }
 
 async function pull() {
-  const since = await db.getMeta('lastPull', '1970-01-01T00:00:00Z');
+  // قد تكون القيمة null بعد حذف البيانات التجريبية؛ نبدأ حينها من البداية
+  const since = (await db.getMeta('lastPull')) || '1970-01-01T00:00:00Z';
   const pendingIds = new Set((await db.getAll('outbox')).filter(e => e.op === 'upsert').map(e => `${e.table}:${e.row_id}`));
   let maxTs = since;
   for (const t of TABLES) {
