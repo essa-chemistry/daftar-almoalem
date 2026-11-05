@@ -68,6 +68,12 @@ export function PaperEntryPage({ q = {} }) {
     return out.join('');
   };
   const filled = Object.entries(vals).filter(([, v]) => v.trim());
+  // لماذا الخلايا مظللة؟ (حصص لم تأتِ بعد، أو قبل تاريخ تسجيل الطالب)
+  const heldPast = ms.filter(m => isHeldStatus(m.status) && m.date <= today);
+  const future = ms.filter(m => isHeldStatus(m.status) && m.date > today).length;
+  const nowRoster = roster(cid, today);
+  const lateStart = nowRoster.map(x => enrollmentsOf(x.student.id).filter(e => e.class_id === cid).map(e => e.start_date).sort()[0]).filter(d => d && d > from);
+  const lateDate = lateStart.length ? lateStart.sort()[lateStart.length - 1] : null;
   const errors = filled.filter(([, v]) => parseCodes(v, map).bad.length);
   const setV = (k, v) => setVals(o => ({ ...o, [k]: v }));
   const insert = code => {
@@ -107,6 +113,8 @@ export function PaperEntryPage({ q = {} }) {
   return html`<div class="page">
     <div class="page-head"><a class="icon-btn" href="#/print"><${Icon} name="back" /></a><div><h1>الإدخال من الكشف الورقي</h1><div class="sub">اكتب الرموز كما في الكشف المطبوع؛ تتحول إلى أحداث بتاريخ الحصة الصحيح. مثال: «2ص ن» = إجابتان صحيحتان ونوم.</div></div>
       <div class="actions"><${Btn} cls="primary" disabled=${!filled.length} onClick=${doSave}><${Icon} name="check" /> حفظ ${filled.length ? `(${filled.length} خلية)` : ''}</${Btn}></div></div>
+    ${ms.length && !heldPast.length && future ? html`<div class="notice" style="margin-bottom:12px">هذه الفترة لم تأتِ بعد، والإدخال متاح فقط للحصص التي انعقدت. اضغط «الأسبوع السابق».</div>` : null}
+    ${heldPast.length && lateDate && lateStart.length >= nowRoster.length / 2 ? html`<div class="notice" style="margin-bottom:12px">أغلب الطلاب مسجلون في الفصل من ${fmtShort(lateDate)} فقط، فالخلايا قبل هذا التاريخ مظللة. إن كانوا معك من بداية الفصل الدراسي فعدّل التاريخ من <a href=${'#/class/' + cid}>صفحة الفصل ← «تاريخ التحاق الطلاب»</a>.</div>` : null}
     <div class="card" style="margin-bottom:12px"><div class="row">
       <select style="max-width:220px" value=${cid} onChange=${e => { setCid(e.target.value); setVals({}); }}>${cls.map(c => html`<option value=${c.id}>${className(c)}</option>`)}</select>
       <label class="row small">أسبوع يبدأ <input type="date" style="width:170px" value=${from} onChange=${e => { setFrom(weekStart(e.target.value)); setVals({}); }} /></label>

@@ -1,6 +1,6 @@
 // الفصول: قائمة الفصول، شاشة الفصل (الطلاب، المقاعد، العدالة)، إضافة طالب
 import { html, useState } from '../lib.js';
-import { ws, get, all, roster, classes, className, privateOf, patch, purge, audit, searchStudents, workspace } from '../store.js';
+import { ws, get, all, roster, classes, className, privateOf, patch, purge, audit, searchStudents, workspace, saveMany, enrollmentsOf } from '../store.js';
 import { useStore, Icon, Avatar, Btn, Tabs, Empty, go, formDialog, confirmDialog, toast } from '../ui.js';
 import { ensureClass, addStudent, nextSeat, openSession, gradeLabel } from '../ops.js';
 import { pickStats } from '../picker.js';
@@ -44,6 +44,22 @@ export function ClassPage({ id, tab = 'students' }) {
   const shown = searchStudents(q, list);
   const setTab = t => go(`#/class/${id}?tab=${t}`);
   const add = () => addStudentDialog(c.id);
+  // تعديل تاريخ بداية تسجيل الطلاب في الفصل دفعة واحدة (مثلاً بعد استيرادهم قبل ضبط التقويم)
+  const fixStart = async () => {
+    const t1 = termRange(workspace(), 1);
+    const v = await formDialog({ title: 'تاريخ التحاق الطلاب بالفصل', fields: [
+      { name: 'date', label: 'مسجلون في الفصل من تاريخ', type: 'date', value: t1?.start || todayISO(), required: true, hint: 'عادةً بداية الفصل الدراسي الأول' },
+    ] });
+    if (!v) return;
+    // نغيّر فقط تسجيل الطالب الأول في هذا الفصل إن كان بعد التاريخ المختار، ولا نمس المنقولين من فصل آخر
+    const targets = all('enrollments', e => e.class_id === c.id && e.start_date > v.date && !e.from_class_id)
+      .filter(e => !enrollmentsOf(e.student_id).some(o => o.id !== e.id && o.start_date < e.start_date));
+    if (!targets.length) return toast('كل الطلاب مسجلون من هذا التاريخ أو قبله', 'ok');
+    if (!await confirmDialog({ title: 'تأكيد', message: `سيُصبح ${targets.length} طالب مسجلين في ${className(c)} من ${fmtDate(v.date)}.\nالطلاب المنقولون من فصل آخر لا يتغيرون.`, okText: 'تطبيق' })) return;
+    await saveMany('enrollments', targets.map(e => ({ ...e, start_date: v.date })));
+    await audit('تعديل تاريخ التحاق الطلاب', `${className(c)}: ${targets.length} طالب من ${v.date}`);
+    toast('تم التعديل', 'ok');
+  };
   const edit = async () => {
     const v = await formDialog({ title: 'تعديل الفصل', fields: [
       { name: 'grade', label: 'الصف', type: 'select', options: Object.entries(GRADE_NAMES).map(([k, l]) => ({ value: k, label: l })), value: String(c.grade) },
@@ -60,7 +76,7 @@ export function ClassPage({ id, tab = 'students' }) {
   };
   return html`<div class="page">
     <div class="page-head"><a class="icon-btn" href="#/classes"><${Icon} name="back" /></a><div><h1>${className(c)}</h1><div class="sub">${roster(c.id, today).length} طالب نشط</div></div>
-      <div class="actions"><button class="btn ghost sm" onClick=${edit}><${Icon} name="edit" size=${16} /> تعديل</button><button class="btn ghost sm" onClick=${del}><${Icon} name="trash" size=${16} /></button>
+      <div class="actions"><button class="btn ghost sm" onClick=${edit}><${Icon} name="edit" size=${16} /> تعديل</button><button class="btn ghost sm" onClick=${fixStart}><${Icon} name="calendar" size=${16} /> تاريخ التحاق الطلاب</button><button class="btn ghost sm" onClick=${del}><${Icon} name="trash" size=${16} /></button>
       <a class="btn" href=${`#/print?class=${c.id}`}><${Icon} name="print" /> كشف المتابعة</a>
       <a class="btn" href=${`#/paper?class=${c.id}`}><${Icon} name="edit" /> إدخال من الكشف الورقي</a>
       <a class="btn" href=${`#/names?class=${c.id}`}><${Icon} name="eye" /> اختبر نفسك في الأسماء</a>
