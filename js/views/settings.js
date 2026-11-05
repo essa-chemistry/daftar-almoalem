@@ -3,7 +3,7 @@
 import { html, useState } from '../lib.js';
 import { S, get, all, ws, save, saveMany, patch, purge, audit, workspace, classes, className, eventTypes, timetables, emit } from '../store.js';
 import { useStore, Icon, Btn, Tabs, Empty, go, formDialog, confirmDialog, toast } from '../ui.js';
-import { buildPeriods, weeklyCounts, HOLIDAY_KINDS, EXC_KINDS } from '../calendar.js';
+import { buildPeriods, weeklyCounts, HOLIDAY_KINDS, EXC_KINDS, termRange } from '../calendar.js';
 import { defaultScheme, validateScheme, METHODS, TASK_KINDS } from '../grading.js';
 import { createWorkspace, setWorkspace, deleteWorkspaceData } from '../ops.js';
 import { exportJSON, exportExcel, restoreJSON } from '../backup.js';
@@ -120,8 +120,20 @@ function TimetableTab({ w }) {
   const [vid, setVid] = useState(versions[versions.length - 1]?.id || '');
   const v = get('timetables', vid) || versions[versions.length - 1];
   const cls = classes(); const periods = w.day?.periods || []; const days = (w.calendar?.workdays || [0, 1, 2, 3, 4]);
+  const editDate = async () => {
+    const t1 = termRange(w, 1);
+    const isFirst = v.id === versions[0]?.id;
+    const r = await formDialog({ title: 'تاريخ سريان هذه النسخة', fields: [{ name: 'from', label: 'ساري من تاريخ', type: 'date', value: v.effective_from, required: true, hint: isFirst && t1 ? `لأول نسخة يُنصح ببداية الفصل الدراسي (${t1.start}) حتى تظهر الحصص الماضية` : '' }] });
+    if (!r || r.from === v.effective_from) return;
+    if (versions.some(x => x.id !== v.id && x.effective_from === r.from)) return toast('توجد نسخة أخرى بالتاريخ نفسه', 'warn');
+    await patch('timetables', v.id, { effective_from: r.from });
+    await audit('تعديل تاريخ سريان الجدول', `${v.effective_from} ← ${r.from}`);
+    toast('حُدّث تاريخ السريان', 'ok');
+  };
   const newVersion = async () => {
-    const r = await formDialog({ title: 'نسخة جدول جديدة', fields: [{ name: 'from', label: 'ساري من تاريخ', type: 'date', value: todayISO(), required: true }, { name: 'label', label: 'الوصف', value: v ? 'تعديل الجدول' : 'الجدول الأسبوعي' }] });
+    // أول نسخة تسري افتراضياً من بداية الفصل الدراسي الأول حتى تظهر الحصص الماضية
+    const first = !versions.length ? (termRange(w, 1)?.start || todayISO()) : todayISO();
+    const r = await formDialog({ title: 'نسخة جدول جديدة', fields: [{ name: 'from', label: 'ساري من تاريخ', type: 'date', value: first, required: true }, { name: 'label', label: 'الوصف', value: v ? 'تعديل الجدول' : 'الجدول الأسبوعي' }] });
     if (!r) return;
     if (versions.some(x => x.effective_from === r.from)) return toast('توجد نسخة بالتاريخ نفسه', 'warn');
     const nv = await save('timetables', { effective_from: r.from, label: r.label, slots: v ? JSON.parse(JSON.stringify(v.slots)) : [] });
@@ -139,7 +151,7 @@ function TimetableTab({ w }) {
   const isLatest = v.id === versions[versions.length - 1].id;
   return html`<div class="stack">
     <div class="card"><div class="row"><label class="field" style="min-width:260px"><span>نسخة الجدول</span><select value=${v.id} onChange=${e => setVid(e.target.value)}>${versions.map(x => html`<option value=${x.id}>${x.label || 'جدول'} — ساري من ${fmtDate(x.effective_from, 'g')}</option>`)}</select></label>
-      <span class="grow"></span><button class="btn soft" onClick=${newVersion}><${Icon} name="plus" /> نسخة جديدة بتاريخ سريان</button>
+      <span class="grow"></span><button class="btn" onClick=${editDate}><${Icon} name="calendar" /> تعديل تاريخ السريان</button><button class="btn soft" onClick=${newVersion}><${Icon} name="plus" /> نسخة جديدة بتاريخ سريان</button>
       ${versions.length > 1 ? html`<button class="btn ghost" onClick=${async () => { if (await confirmDialog({ title: 'حذف نسخة الجدول', message: 'حذف هذه النسخة؟', danger: true, okText: 'حذف' })) { await purge('timetables', [v.id]); setVid(''); } }}><${Icon} name="trash" /></button>` : null}</div>
       ${!isLatest ? html`<div class="notice" style="margin-top:10px">تعدّل نسخة قديمة؛ هذا يغيّر الحصص المحسوبة لفترتها. لتغيير الجدول من الآن فصاعداً أنشئ «نسخة جديدة».</div>` : html`<p class="muted small" style="margin-bottom:0">لتعديل الجدول دون تغيير سجل ما مضى، أنشئ نسخة جديدة بتاريخ سريان.</p>`}</div>
     <div class="card"><div class="table-wrap" style="border:0"><table class="tt"><thead><tr><th></th>${days.map(d => html`<th>${DAY_NAMES[d]}</th>`)}</tr></thead>

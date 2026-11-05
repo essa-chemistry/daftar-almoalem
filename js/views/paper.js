@@ -3,6 +3,7 @@ import { html, useState, useRef } from '../lib.js';
 import { get, all, save, audit, classes, className, roster, calCtx, findSession, sessionAttendance, sessionEvents, eventTypes, enrollmentsOf, isEnrolledOn } from '../store.js';
 import { useStore, Icon, Btn, Empty, toast } from '../ui.js';
 import { meetingsRange, isHeldStatus } from '../calendar.js';
+import { timetables } from '../store.js';
 import { setAttendance, addEvent } from '../ops.js';
 import { todayISO, weekStart, addDays, DAY_SHORT, dow, fmtShort, normDigits } from '../utils.js';
 
@@ -123,7 +124,7 @@ export function PaperEntryPage({ q = {} }) {
       <div class="chips" style="margin-top:10px">${[...map.entries()].map(([c, x]) => html`<button class=${'chip'} onMouseDown=${e => e.preventDefault()} onClick=${() => insert(c)} title=${x.t.name}><b>${c}</b> ${x.t.name}</button>`)}</div>
       ${fParse ? html`<div class=${fParse.bad.length ? 'error small' : 'info small'} style="margin-top:8px">${fParse.items.map(i => `${i.n > 1 ? i.n + '× ' : ''}${i.t.name}`).join('، ') || '—'}${fParse.bad.length ? ` — غير معروف: ${fParse.bad.join(' ')}` : ''}</div>` : null}
     </div>
-    ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص لهذا الفصل في هذه الفترة" /></div>` : html`
+    ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص لهذا الفصل في هذه الفترة">${timetables()[0] && timetables()[0].effective_from > from ? html`<span>الجدول الأسبوعي ساري من ${fmtShort(timetables()[0].effective_from)} فقط، فلا تظهر حصص قبله. عدّل تاريخه من <a href="#/settings/timetable">الإعدادات ← الجدول ← «تعديل تاريخ السريان»</a> إلى بداية الفصل الدراسي.</span>` : !timetables().length ? html`<span>لم يُضبط الجدول الأسبوعي بعد. <a href="#/settings/timetable">اضبطه من الإعدادات</a>.</span>` : html`<span>تحقق من أن الأسبوع داخل تواريخ الفصل الدراسي، ومن أن الفصل له حصص في الجدول.</span>`}</${Empty}></div>` : html`
     <div class="table-wrap"><table class="tbl paper-grid">
       <thead><tr><th rowspan="2">م</th><th rowspan="2">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">الأسبوع ${fmtShort(g.s)}</th>`)}</tr>
         <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br />ح${m.period}</th>`)}</tr></thead>
