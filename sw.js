@@ -1,5 +1,5 @@
 // Service Worker: يعمل التطبيق بلا إنترنت (الملفات محلياً + مكتبات CDN بعد أول تحميل)
-const VERSION = 'daftar-v3.0.0';
+const VERSION = 'daftar-v3.0.1';
 const SHELL = [
   './', './index.html', './student.html', './config.js', './manifest.json', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './css/app.css', './css/print.css',
@@ -40,7 +40,8 @@ self.addEventListener('fetch', e => {
     const hit = await c.match(req, { ignoreSearch: sameOrigin });
     // الشبكة أولاً لملفات التطبيق (لتصل التحديثات)، والذاكرة عند انقطاع الاتصال
     if (sameOrigin) {
-      try { const res = await fetch(req); if (res.ok) c.put(req, res.clone()); return res; }
+      // no-cache: يتحقق من الخادم في كل مرة فتصل تحديثات الملفات فوراً بدل انتظار ذاكرة المتصفح
+      try { const res = await fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }); if (res.ok) c.put(req, res.clone()); return res; }
       catch { return hit || (req.mode === 'navigate' ? c.match('./index.html') : Response.error()); }
     }
     // المكتبات الخارجية: من الذاكرة ثم تحديث في الخلفية
