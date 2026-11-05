@@ -191,7 +191,7 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary); 
 .hexmark { display: inline-grid; place-items: center; width: 54px; height: 54px; clip-path: var(--hex); background: var(--primary-soft); color: var(--primary-strong); }
 
 /* ---------- التبويبات ---------- */
-.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 16px; scrollbar-width: none; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; overflow-x: auto; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 16px; scrollbar-width: none; }
 .tabs button { flex: none; border: 0; background: transparent; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 700; color: var(--muted); white-space: nowrap; }
 .tabs button.on { background: var(--primary-soft); color: var(--primary-strong); }
 .tab-badge { margin-inline-start: 6px; background: var(--neg); color: #fff; border-radius: 999px; padding: 0 6px; font-size: .72rem; }
