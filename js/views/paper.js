@@ -22,7 +22,9 @@ export function codeMap() {
 // تحليل نص الخلية: «2ص ن» = إجابتان صحيحتان + نوم
 export function parseCodes(str, map) {
   const codes = [...map.keys()].sort((a, b) => b.length - a.length);
-  const s = normDigits(String(str || '')).replace(/[\s,،+✓.\-]/g, '');
+  // الفواصل تُتجاهل، إلا إن كان أحدها رمزاً معتمداً (مثل ✓ للإجابة الصحيحة)
+  const used = new Set(codes.join(''));
+  const s = [...normDigits(String(str || ''))].filter(ch => !(/\s/.test(ch) || (',،+.-✓'.includes(ch) && !used.has(ch)))).join('');
   const items = [], bad = [];
   let i = 0;
   while (i < s.length) {

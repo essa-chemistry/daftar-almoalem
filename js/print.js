@@ -30,7 +30,7 @@ export function header(title, metaPairs = []) {
 
 function codeKey(extra = []) {
   const types = eventTypes().filter(t => t.code);
-  return `<div class="pr-key"><span><b>✓</b>حاضر</span>${types.map(t => `<span><b>${e(t.code)}</b>${e(t.name)}</span>`).join('')}${extra.join('')}<span><b style="background:#ddd">▨</b>إجازة/حصة ملغاة</span></div>`;
+  return `<div class="pr-key">${types.some(t => t.code.trim() === '✓') ? '' : '<span><b>✓</b>حاضر</span>'}${types.map(t => `<span><b>${e(t.code)}</b>${e(t.name)}</span>`).join('')}${extra.join('')}<span><b style="background:#ddd">▨</b>إجازة/حصة ملغاة</span></div>`;
 }
 
 function recordedCodes(classId, studentId, date, period) {
