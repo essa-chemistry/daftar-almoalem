@@ -1,6 +1,7 @@
 // الطباعة: ترويسة المدرسة، كشف المتابعة الأسبوعي، كشف الحصة، كشف المهمة، كشف تفصيل الدرجة
 import { workspace, get, roster, eventTypes, calCtx, className, all, ws, sessionAttendance, sessionEvents, findSession, enrollmentsOf, isEnrolledOn } from './store.js';
 import { meetingsRange, isHeldStatus, termRange } from './calendar.js';
+import { studyWeeks } from './plan.js';
 import { escapeHTML as e, DAY_SHORT, DAY_NAMES, weekStart, fmtShort, fmtHijriShort, fmtDate, fmtDateLong, todayISO, dow, addDays, fmtNum } from './utils.js';
 import { TASK_KINDS, HW_STATUS, METHODS, taskMode, ATT_STATUS, OCC_STATUS } from './grading.js';
 
@@ -57,7 +58,8 @@ export function weeklySheet({ classId, from, to, weeksPerPage = 'auto', extraRow
   }
   const usable = weeks.filter(w => w.items.some(m => isHeldStatus(m.status)));
   if (!usable.length) return null;
-  usable.forEach((w, i) => { w.n = i + 1; });
+  const sw = [...studyWeeks(workspace(), 1), ...studyWeeks(workspace(), 2)];
+  usable.forEach((w, i) => { w.n = sw.find(x => x.from === w.start)?.n || i + 1; });
   const pages = []; let cur = [], cols = 0;
   const perPage = weeksPerPage === 'auto' ? null : +weeksPerPage;
   for (const w of usable) {
@@ -77,7 +79,7 @@ export function weeklySheet({ classId, from, to, weeksPerPage = 'auto', extraRow
     });
     const nameW = 46, seatW = 7, noteW = 24;
     const colgroup = `<colgroup><col style="width:${seatW}mm"><col style="width:${nameW}mm">${cells.map(() => '<col>').join('')}<col style="width:${noteW}mm"></colgroup>`;
-    const h1 = `<tr><th rowspan="3">م</th><th rowspan="3">اسم الطالب</th>${pw.map(w => `<th class="wk wk-sep" colspan="${w.items.length}">الأسبوع ${w.n} — ${fmtShort(w.items[0].date)}</th>`).join('')}<th rowspan="3">ملاحظات</th></tr>`;
+    const h1 = `<tr><th rowspan="3">م</th><th rowspan="3">اسم الطالب</th>${pw.map(w => `<th class="wk wk-sep" colspan="${w.items.length}">الأسبوع ${w.n} — ${fmtShort(w.items[0].date)}${hijri ? ` | ${fmtHijriShort(w.items[0].date)}` : ''}</th>`).join('')}<th rowspan="3">ملاحظات</th></tr>`;
     const h2 = `<tr>${cells.map(m => `<th class="vt ${m.first ? 'wk-sep' : ''} ${isHeldStatus(m.status) ? '' : 'shade'}">${DAY_SHORT[dow(m.date)]}<br>${fmtShort(m.date)}${hijri ? `<br><span style="font-weight:400">${fmtHijriShort(m.date)}</span>` : ''}</th>`).join('')}</tr>`;
     const h3 = `<tr>${cells.map(m => `<th class="vt ${m.first ? 'wk-sep' : ''} ${isHeldStatus(m.status) ? '' : 'shade'}">ح${m.period}</th>`).join('')}</tr>`;
     const body = rows.map((x, i) => {

@@ -469,3 +469,15 @@ body.floating { background: var(--surface); }
 .wk-sel { width: auto; min-width: 260px; max-width: 100%; }
 .paper-grid .wk-h .wk-d { font-weight: 400; opacity: .8; font-size: .78rem; margin-inline-start: 6px; }
 .paper-grid th .hj { font-weight: 400; color: var(--muted); font-size: .74rem; }
+
+/* الكشف الورقي: تعديل ما سُجّل + العرض الكامل */
+.paper-grid td.pcell input.has { background: var(--surface-2); font-weight: 700; }
+.paper-grid td.pcell input.del { border: 2px dashed var(--neg, #dc2626); background: color-mix(in oklab, var(--neg, #dc2626) 8%, transparent); }
+.full-grid td.fcell { text-align: center; font-weight: 700; font-size: .82rem; min-width: 38px; cursor: pointer; white-space: nowrap; padding: 4px 3px; }
+.full-grid td.fcell:hover { background: var(--primary-soft); }
+.full-grid td.fcell.ab { color: var(--neg, #dc2626); }
+.full-grid td.shaded { background: repeating-linear-gradient(-45deg, var(--surface-2), var(--surface-2) 4px, transparent 4px, transparent 8px); cursor: default; }
+.full-grid th { font-size: .72rem; padding: 4px 3px; }
+.full-grid .sum { text-align: center; font-weight: 800; min-width: 44px; background: var(--surface-2); }
+.full-grid td.sum.pos { color: var(--pos, #16a34a); } .full-grid td.sum.neg { color: var(--neg, #dc2626); }
+.full-wrap { max-height: calc(100dvh - 62px - 150px); }
