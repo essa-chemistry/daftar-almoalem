@@ -453,3 +453,8 @@ body.floating { background: var(--surface); }
 .tag-row { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .tag-row .icon-btn { width: 32px; height: 32px; font-size: .7rem; }
 .tag-row .icon-btn:disabled { opacity: .3; cursor: default; }
+/* الخطة السنوية */
+.plan-tbl tr.pk-break td { background: repeating-linear-gradient(-45deg, var(--surface-2), var(--surface-2) 4px, transparent 4px, transparent 8px); }
+.plan-tbl tr.pk-activity td, .tbl tr.pk-activity td { background: var(--warn-bg); }
+.tbl tr.wk-top td { border-top: 2px solid var(--line-strong, var(--line)); }
+.plan-tbl td { vertical-align: top; }

@@ -1,10 +1,10 @@
 // Service Worker: يعمل التطبيق بلا إنترنت (الملفات محلياً + مكتبات CDN بعد أول تحميل)
-const VERSION = 'daftar-v3.0.3';
+const VERSION = 'daftar-v3.0.4';
 const SHELL = [
   './', './index.html', './student.html', './config.js', './manifest.json', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './css/app.css', './css/print.css',
   './js/main.js', './js/lib.js', './js/ui.js', './js/theme.js', './js/utils.js', './js/db.js', './js/store.js', './js/sync.js', './js/calendar.js',
-  './js/grading.js', './js/gradeutil.js', './js/tags.js', './js/picker.js', './js/defaults.js', './js/ops.js', './js/demo.js', './js/print.js', './js/backup.js',
+  './js/grading.js', './js/gradeutil.js', './js/tags.js', './js/planprint.js', './js/picker.js', './js/defaults.js', './js/ops.js', './js/demo.js', './js/print.js', './js/backup.js',
   './js/views/today.js', './js/views/session.js', './js/views/classes.js', './js/views/student.js', './js/views/importer.js',
   './js/views/tasks.js', './js/views/grades.js', './js/views/printview.js', './js/views/settings.js',
   './js/forms.js', './js/views/forms.js', './js/views/paper.js', './js/views/names.js',

@@ -79,3 +79,19 @@ table.pr.pr-beh td.nm2 { text-align: right; padding-inline-start: 4px; }
 .seat-print .sp.aisle { border: 0; }
 .seat-print .sp b { display: block; }
 .seat-board { text-align: center; border: 2px solid #12355b; border-radius: 3mm; padding: 2mm; font-weight: 800; margin-top: 4mm; }
+/* الخطة السنوية */
+table.pr.plan { font-size: 8.8pt; }
+table.pr.plan tbody tr { height: auto; }
+table.pr.plan td { padding: 2px 4px; line-height: 1.35; }
+table.pr.plan td.wrap { white-space: normal; text-overflow: clip; }
+table.pr.plan td.unit { font-weight: 700; background: #f4f7fa; font-size: 8.5pt; }
+table.pr.plan .g { color: #444; font-size: 7.8pt; }
+table.pr.plan small { font-size: 7.6pt; color: #444; }
+table.pr.plan td.small { font-size: 7.8pt; }
+table.pr.plan tr.pk-break td { background: repeating-linear-gradient(-45deg, #ececec, #ececec 3px, #fff 3px, #fff 6px); font-weight: 700; }
+table.pr.plan tr.pk-activity td { background: #fbf6e6; }
+table.pr.dist tr.wk-first td { border-top: 2px solid #000; }
+table.pr.dist td.wkc { background: #f4f7fa; }
+table.pr .muted { color: #777; }
+table.pr.plan thead { display: table-header-group; }
+table.pr.plan tr { break-inside: avoid; }
