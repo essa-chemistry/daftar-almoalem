@@ -9,6 +9,7 @@ import { currentTerm, defaultPeriod } from '../calendar.js';
 import { ATT_STATUS } from '../grading.js';
 import { workspace } from '../store.js';
 import { ReferralsList } from './forms.js';
+import { tagLibrary, addTag, openTagManager } from '../tags.js';
 
 export function StudentPage({ id, tab = 'profile' }) {
   useStore();
@@ -73,9 +74,9 @@ function Profile({ st, pv }) {
     <div class="card"><h2><${Icon} name="heart" /> تنبيهات صحية <span class="badge">خاصة بالمعلم</span></h2>
       <div class="chips">${HEALTH_FLAGS.map(h => { const on = (pv.health || []).includes(h); return html`<button class=${'chip' + (on ? ' on' : '')} style=${on ? 'background:var(--neg)' : ''} onClick=${() => savePv({ health: on ? pv.health.filter(x => x !== h) : [...(pv.health || []), h] })}>${h}</button>`; })}</div>
       <label class="field" style="margin-top:10px"><span>تفاصيل (نص حر)</span><textarea rows="2" value=${pv.health_note || ''} onChange=${e => savePv({ health_note: e.target.value })} placeholder="مثال: يحمل بخاخاً، يُراعى في المختبر…"></textarea></label>
-      <h3 style="margin-top:16px">وسوم المعلم</h3>
-      <div class="chips">${[...new Set([...TEACHER_TAGS, ...(pv.tags || [])])].map(t => { const on = (pv.tags || []).includes(t); return html`<button class=${'chip' + (on ? ' on' : '')} onClick=${() => savePv({ tags: on ? pv.tags.filter(x => x !== t) : [...(pv.tags || []), t] })}>${t}</button>`; })}
-        <button class="chip" onClick=${async () => { const v = await formDialog({ title: 'وسم جديد', fields: [{ name: 't', label: 'الوسم', required: true }] }); if (v) savePv({ tags: [...(pv.tags || []), v.t.trim()] }); }}>+ وسم</button></div>
+      <div class="row" style="margin-top:16px;justify-content:space-between"><h3 style="margin:0">وسوم المعلم</h3><button class="btn ghost sm" onClick=${openTagManager}><${Icon} name="edit" size=${15} /> إدارة الوسوم</button></div>
+      <div class="chips">${[...new Set([...tagLibrary(), ...(pv.tags || [])])].map(t => { const on = (pv.tags || []).includes(t); return html`<button class=${'chip' + (on ? ' on' : '')} onClick=${() => savePv({ tags: on ? pv.tags.filter(x => x !== t) : [...(pv.tags || []), t] })}>${t}</button>`; })}
+        <button class="chip" onClick=${async () => { const v = await formDialog({ title: 'وسم جديد', fields: [{ name: 't', label: 'الوسم (يُحفظ في القائمة ويصبح متاحاً لكل الطلاب)', required: true }] }); if (!v) return; const t = await addTag(v.t); if (t && !(pv.tags || []).includes(t)) await savePv({ tags: [...(pv.tags || []), t] }); }}>+ وسم</button></div>
       <p class="muted small" style="margin-top:10px">التنبيهات الصحية والوسوم والملاحظات الخاصة لا تظهر للطالب ولا في وضع العرض ولا في أي تقرير.</p>
     </div>
   </div>`;

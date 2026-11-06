@@ -447,3 +447,9 @@ body.floating { background: var(--surface); }
 }
 .paper-grid { border-collapse: separate; border-spacing: 0; }
 .table-wrap.paper-wrap { padding: 0; }
+
+/* إدارة الوسوم */
+.tag-list { display: flex; flex-direction: column; gap: 4px; max-height: 52vh; overflow: auto; }
+.tag-row { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.tag-row .icon-btn { width: 32px; height: 32px; font-size: .7rem; }
+.tag-row .icon-btn:disabled { opacity: .3; cursor: default; }

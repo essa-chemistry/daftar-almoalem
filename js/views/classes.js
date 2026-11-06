@@ -7,6 +7,7 @@ import { pickStats } from '../picker.js';
 import { todayISO, daysBetween, fmtDate, shortName, GRADE_NAMES, addDays, fmtNum } from '../utils.js';
 import { termRange, currentTerm } from '../calendar.js';
 import { SeatEditor } from './seatmap.js';
+import { tagLibrary, tagCounts, openTagManager } from '../tags.js';
 
 export function ClassesPage() {
   useStore();
@@ -38,10 +39,12 @@ export function ClassPage({ id, tab = 'students' }) {
   const c = get('classes', id);
   const [q, setQ] = useState('');
   const [showLeft, setShowLeft] = useState(false);
+  const [tag, setTag] = useState('');
   if (!c) return html`<div class="page"><${Empty} title="الفصل غير موجود" /></div>`;
   const today = todayISO();
   const list = roster(c.id, today, { includeLeft: showLeft });
-  const shown = searchStudents(q, list);
+  const shown = searchStudents(q, list).filter(x => !tag || (privateOf(x.student.id).tags || []).includes(tag));
+  const usedTags = (() => { const n = tagCounts(); return tagLibrary().filter(t => n.has(t)); })();
   const setTab = t => go(`#/class/${id}?tab=${t}`);
   const add = () => addStudentDialog(c.id);
   // تعديل تاريخ بداية تسجيل الطلاب في الفصل دفعة واحدة (مثلاً بعد استيرادهم قبل ضبط التقويم)
@@ -85,6 +88,8 @@ export function ClassPage({ id, tab = 'students' }) {
     <${Tabs} active=${tab} onChange=${setTab} tabs=${[{ key: 'students', label: 'الطلاب' }, { key: 'seats', label: 'خريطة المقاعد' }, { key: 'fair', label: 'لوحة العدالة' }]} />
     ${tab === 'students' ? html`
       <div class="row" style="margin-bottom:12px"><div class="search grow" style="max-width:420px"><${Icon} name="search" size=${18} /><input placeholder="ابحث بجزء من الاسم أو بالرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
+        ${usedTags.length ? html`<select style="width:auto;max-width:220px" value=${tag} onChange=${e => setTag(e.target.value)} title="عرض الطلاب الذين يحملون وسماً معيناً"><option value="">كل الوسوم</option>${usedTags.map(t => html`<option value=${t}>${t}</option>`)}</select>` : null}
+        <button class="btn ghost sm" onClick=${openTagManager}>إدارة الوسوم</button>
         <label class="check small"><input type="checkbox" checked=${showLeft} onChange=${e => setShowLeft(e.target.checked)} /> إظهار المنسحبين والمنقولين</label></div>
       ${shown.length ? html`<div class="sgrid">${shown.map(x => {
         const pv = privateOf(x.student.id);
@@ -92,7 +97,7 @@ export function ClassPage({ id, tab = 'students' }) {
           <span class="seat">${x.student.seat_no || ''}</span>${pv.starred ? html`<span class="star">★</span>` : null}
           <${Avatar} student=${x.student} size=${62} health=${true} /><span class="nm">${x.student.full_name}</span>
           <span class="marks">${(pv.tags || []).slice(0, 2).map(t => html`<span class="badge pri">${t}</span>`)}</span></div>`;
-      })}</div>` : html`<${Empty} icon="users" title=${q ? 'لا نتائج' : 'لا يوجد طلاب'}>${!q ? html`<button class="btn primary" onClick=${add}>إضافة طالب</button>` : null}</${Empty}>`}` : null}
+      })}</div>` : html`<${Empty} icon="users" title=${q || tag ? 'لا نتائج' : 'لا يوجد طلاب'}>${!q && !tag ? html`<button class="btn primary" onClick=${add}>إضافة طالب</button>` : null}</${Empty}>`}` : null}
     ${tab === 'seats' ? html`<${SeatEditor} c=${c} />` : null}
     ${tab === 'fair' ? html`<${Fairness} c=${c} />` : null}
   </div>`;
