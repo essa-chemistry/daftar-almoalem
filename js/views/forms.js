@@ -5,7 +5,7 @@ import { useStore, Icon, Btn, Empty, go, formDialog, toast, Avatar } from '../ui
 import { printHTML } from '../print.js';
 import { behaviorFormSheet, referralSheet, parentReportSheet } from '../forms.js';
 import { gradeStudent } from '../gradeutil.js';
-import { currentTerm, termRange, periodAt } from '../calendar.js';
+import { currentTerm, termRange, periodAt, evalPeriods, evalRange, defaultPeriod } from '../calendar.js';
 import { REFERRAL_TO, REFERRAL_STATUS, RESPONSES, SEVERITIES, DEFAULT_REFERRAL_REASONS, DEFAULT_PARENT_TEMPLATES, severityOf } from '../defaults.js';
 import { todayISO, addDays, fmtDate, fmtShort, nowMinutes, uuid } from '../utils.js';
 import { taskMode } from '../grading.js';
@@ -232,8 +232,8 @@ export function ReferralPage({ q = {} }) {
 }
 
 // ---------- تقرير ولي الأمر ----------
-function parentStats(stId, cls, term) {
-  const w = workspace(); const r = termRange(w, term); if (!r) return null;
+function parentStats(stId, cls, term, pid = null) {
+  const w = workspace(); const r = evalRange(w, term, pid); if (!r) return null;
   const inT = d => d >= r.start && d <= r.end;
   const types = new Map(eventTypes({ activeOnly: false }).map(t => [t.id, t]));
   const evs = all('events', e => e.student_id === stId && e.class_id === cls.id && !e.voided && inT(e.date));
@@ -257,20 +257,23 @@ export function ParentReportPage({ q = {} }) {
   useStore();
   const w = workspace(); const today = todayISO();
   const [sid, setSid] = useState(q.student || '');
-  const [term, setTerm] = useState(currentTerm(w, today));
+  const [term, setTerm0] = useState(currentTerm(w, today));
+  const [pid, setPid] = useState(() => defaultPeriod(w, currentTerm(w, today), today));
+  const setTerm = t => { setTerm0(t); setPid(defaultPeriod(w, t, today)); };
+  const periods = evalPeriods(w, term); const P = pid && periods.some(p => p.id === pid) ? pid : null; const rng = evalRange(w, term, P);
   const [sec, setSec] = useState({ attendance: true, participation: true, homework: true, tests: true, behavior: true, grade: true, breakdown: true });
   const [message, setMessage] = useState('');
   const [request, setRequest] = useState({ on: false, date: addDays(today, 2), time: '09:00', purpose: '' });
   const [logIt, setLogIt] = useState(true);
   const st = sid ? get('students', sid) : null;
   const cls = st ? (classOf(st.id) || lastClassOf(st.id)) : null;
-  const g = st && cls ? gradeStudent(st.id, cls.id, term) : null;
-  const stats = st && cls ? parentStats(st.id, cls, term) : null;
-  const sheet = g && stats ? parentReportSheet({ st, cls, term, g, sections: sec, stats, message, request }) : '';
+  const g = st && cls ? gradeStudent(st.id, cls.id, term, { pid: P }) : null;
+  const stats = st && cls ? parentStats(st.id, cls, term, P) : null;
+  const sheet = g && stats ? parentReportSheet({ st, cls, term, g, sections: sec, stats, message, request, label: rng?.label }) : '';
   const S_ = [['attendance', 'الحضور والغياب والتأخر'], ['participation', 'المشاركة'], ['homework', 'الواجبات'], ['tests', 'الاختبارات'], ['behavior', 'السلوك'], ['grade', 'الدرجة الأدائية'], ['breakdown', 'تفصيل الدرجة']];
   const doPrint = async () => {
     printHTML(sheet);
-    if (logIt) await save('contacts', { student_id: st.id, date: today, method: 'خطاب', summary: `تقرير ولي الأمر (الفصل الدراسي ${term === 1 ? 'الأول' : 'الثاني'})${request.on ? ' مع طلب حضور' : ''}` });
+    if (logIt) await save('contacts', { student_id: st.id, date: today, method: 'خطاب', summary: `تقرير ولي الأمر (${rng?.label || ''})${request.on ? ' مع طلب حضور' : ''}` });
   };
   return html`<div class="page">
     <div class="page-head"><a class="icon-btn" href="#/print?tab=forms"><${Icon} name="back" /></a><div><h1>تقرير ولي الأمر</h1><div class="sub">لا يتضمن الملاحظات الخاصة ولا التنبيهات الصحية ولا أي مقارنة بطلاب آخرين.</div></div>
@@ -278,7 +281,8 @@ export function ParentReportPage({ q = {} }) {
     <div class="grid-2" style="align-items:start">
       <div class="stack">
         <div class="card stack"><h2>الطالب</h2><${StudentPicker} value=${sid} onChange=${setSid} />
-          <div class="chips">${[1, 2].map(t => html`<button class=${'chip' + (term === t ? ' on' : '')} onClick=${() => setTerm(t)}>الفصل الدراسي ${t === 1 ? 'الأول' : 'الثاني'}</button>`)}</div></div>
+          <div class="chips">${[1, 2].map(t => html`<button class=${'chip' + (term === t ? ' on' : '')} onClick=${() => setTerm(t)}>الفصل الدراسي ${t === 1 ? 'الأول' : 'الثاني'}</button>`)}</div>
+          ${periods.length ? html`<div class="chips">${periods.map(p => html`<button class=${'chip' + (P === p.id ? ' on' : '')} onClick=${() => setPid(p.id)}>${p.label}</button>`)}<button class=${'chip' + (!P ? ' on' : '')} onClick=${() => setPid(null)}>الفصل كاملاً</button></div>` : null}</div>
         <div class="card stack"><h2>أقسام التقرير</h2><div class="chips">${S_.map(([k, l]) => html`<button class=${'chip' + (sec[k] ? ' on' : '')} onClick=${() => setSec({ ...sec, [k]: !sec[k] })}>${l}</button>`)}</div></div>
         <div class="card stack"><h2>رسالة لولي الأمر</h2>
           <div class="chips">${parentTemplates().map(tp => html`<button class="chip" onClick=${() => setMessage(m => m ? m + '\n' + tp.text : tp.text)}>+ ${tp.title}</button>`)}</div>

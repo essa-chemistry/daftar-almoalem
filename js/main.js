@@ -97,7 +97,7 @@ function Page({ route }) {
     case 'tasks': return html`<${TasksPage} q=${q} />`;
     case 'task': return html`<${TaskPage} id=${a[0]} classId=${q.class} />`;
     case 'grades': return html`<${GradesPage} q=${q} />`;
-    case 'grade': return html`<${GradeDetailPage} classId=${a[0]} term=${+a[1]} studentId=${a[2]} />`;
+    case 'grade': return html`<${GradeDetailPage} classId=${a[0]} term=${+a[1]} studentId=${a[2]} pid=${q.p || null} />`;
     case 'print': return html`<${PrintPage} q=${q} />`;
     case 'settings': return html`<${SettingsPage} tab=${a[0]} />`;
     case 'paper': return html`<${PaperEntryPage} q=${q} />`;

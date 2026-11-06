@@ -3,7 +3,7 @@
 import { S, get, all, ws, save, workspace, classOf, lastClassOf, className, enrollmentsOf, roster, classes } from './store.js';
 import { SYNC, client } from './sync.js';
 import { classGradeRows, lockFor } from './gradeutil.js';
-import { termRange, currentTerm } from './calendar.js';
+import { termRange, currentTerm, evalPeriods, evalRange } from './calendar.js';
 import { randomDigits, todayISO, escapeHTML as e, loadScript } from './utils.js';
 import { header } from './print.js';
 
@@ -33,6 +33,7 @@ export const studentPortalUrl = () => new URL('student.html', location.href).hre
 // ---------- لقطة الدرجة المنشورة للبوابة ----------
 function snapshotOf(x, lock) {
   const sv = lock?.snapshot?.students?.find(s => s.student_id === x.student.id);
+  // ملاحظة: اللقطة المعتمدة تخص الفترة نفسها لأن lockFor يُستدعى بالفترة
   if (sv) return { total: sv.total, monthly: sv.monthly, grand: sv.grand, approved: true, categories: sv.categories.map(c => ({ name: c.name, weight: c.weight, final: c.final, text: c.text || '' })) };
   const g = x.g;
   return { total: g.total, monthly: g.monthly.final, monthly_of: g.monthly.weight, grand: g.grand, approved: false, categories: g.categories.map(c => ({ name: c.name, weight: c.weight, final: c.final, text: c.text })) };
@@ -40,18 +41,26 @@ function snapshotOf(x, lock) {
 export async function publishSnapshots() {
   const w = workspace(); if (!w) return 0;
   const today = todayISO(); let n = 0;
-  const existing = new Map(ws('portal_snapshots').map(r => [`${r.student_id}|${r.class_id}|${r.term}`, r]));
+  // لقطة لكل فترة تقويم بدأت (أو للفصل كاملاً إن لم تُحدَّد فترات)
+  const existing = new Map(ws('portal_snapshots').map(r => [`${r.student_id}|${r.class_id}|${r.term}|${r.period || ''}`, r]));
+  const keep = new Set();
   for (const c of classes()) for (const term of [1, 2]) {
     const r = termRange(w, term); if (!r || r.start > today) continue;
-    const lock = lockFor(c.id, term);
-    for (const x of classGradeRows(c.id, term)) {
-      const result = snapshotOf(x, lock);
-      const k = `${x.student.id}|${c.id}|${term}`; const old = existing.get(k);
-      if (old && JSON.stringify(old.result) === JSON.stringify(result)) continue;
-      await save('portal_snapshots', { ...(old || {}), student_id: x.student.id, class_id: c.id, term, result });
-      n++;
+    const ps = evalPeriods(w, term).filter(p => p.start <= today);
+    const ranges = evalPeriods(w, term).length ? ps.map(p => evalRange(w, term, p.id)) : [evalRange(w, term, null)];
+    for (const rg of ranges) {
+      const lock = lockFor(c.id, term, rg.pid);
+      for (const x of classGradeRows(c.id, term, rg.pid)) {
+        const result = { ...snapshotOf(x, lock), label: rg.label, start: rg.start, end: rg.end };
+        const k = `${x.student.id}|${c.id}|${term}|${rg.pid || ''}`; keep.add(k); const old = existing.get(k);
+        if (old && JSON.stringify(old.result) === JSON.stringify(result)) continue;
+        await save('portal_snapshots', { ...(old || {}), student_id: x.student.id, class_id: c.id, term, period: rg.pid, result });
+        n++;
+      }
     }
   }
+  // إزالة لقطات فترات أُلغيت أو تغيّرت
+  for (const [k, row] of existing) if (!keep.has(k)) { await save('portal_snapshots', { ...row, deleted: true }); n++; }
   return n;
 }
 
@@ -90,6 +99,7 @@ export function buildPortalData(studentId) {
   if (sh.tests) out.tests = myTasks.filter(t => ['quiz', 'monthly', 'final', 'worksheet', 'performance', 'project'].includes(t.kind)).sort((a, b) => b.date.localeCompare(a.date))
     .map(t => ({ title: t.title, kind: t.kind, date: t.date, max: t.max_score, score: res.get(t.id)?.score ?? null, status: res.get(t.id)?.status || null }));
   if (sh.grade && gradesOk) out.grades = ws('portal_snapshots', g => g.student_id === studentId).sort((a, b) => a.term - b.term)
+    .sort((a, b) => (a.result?.start || '').localeCompare(b.result?.start || ''))
     .map(g => ({ term: g.term, class: className(get('classes', g.class_id)), ...g.result, categories: sh.breakdown ? g.result.categories : null }));
   return out;
 }

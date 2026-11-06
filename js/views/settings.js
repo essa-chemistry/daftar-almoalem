@@ -12,6 +12,7 @@ import { setUI, getUI } from '../theme.js';
 import { schemeFor } from '../gradeutil.js';
 import { PortalSettings } from './portal.js';
 import { DEFAULT_REFERRAL_REASONS, DEFAULT_PARENT_TEMPLATES, SEVERITIES, severityOf } from '../defaults.js';
+import { daysBetween, addDays, weekStart } from '../utils.js';
 import { DAY_NAMES, todayISO, compressImage, fmtDate, fmtDateTime, uuid, fmtNum, GRADE_NAMES } from '../utils.js';
 
 const TABS = [
@@ -82,11 +83,61 @@ function CalendarTab({ w }) {
     <div class="card"><h2>الفصلان الدراسيان</h2><div class="form-grid">${[0, 1].map(i => html`
       <${Field} label=${`بداية الفصل ${i ? 'الثاني' : 'الأول'}`}><input type="date" value=${terms[i]?.start || ''} onChange=${e => setTerm(i, 'start', e.target.value)} /></${Field}>
       <${Field} label=${`نهاية الفصل ${i ? 'الثاني' : 'الأول'}`}><input type="date" value=${terms[i]?.end || ''} onChange=${e => setTerm(i, 'end', e.target.value)} /></${Field}>`)}</div></div>
+    <${PeriodsCard} w=${w} />
     <div class="card"><h2>أيام الدوام</h2><div class="chips">${DAY_NAMES.map((d, i) => html`<button class=${'chip' + (wd.includes(i) ? ' on' : '')} onClick=${() => upd(w, { calendar: { ...cal, workdays: wd.includes(i) ? wd.filter(x => x !== i) : [...wd, i].sort() } })}>${d}</button>`)}</div></div>
     <div class="card"><div class="row" style="margin-bottom:10px"><h2 style="margin:0">الإجازات وأسابيع الاختبارات وأيام التعطيل</h2><span class="grow"></span><button class="btn primary sm" onClick=${() => addHol()}><${Icon} name="plus" size=${16} /> إضافة</button></div>
       ${(cal.holidays || []).length ? html`<div class="list">${cal.holidays.map(h => html`<div class="li"><span class=${'badge ' + (h.kind === 'exams' ? 'warn' : 'pri')}>${HOLIDAY_KINDS[h.kind]}</span><div class="grow"><div class="main-t">${h.label || HOLIDAY_KINDS[h.kind]}</div><div class="sub-t">${fmtDate(h.from)}${h.to && h.to !== h.from ? ' — ' + fmtDate(h.to) : ''}</div></div>
         <button class="icon-btn" onClick=${() => addHol(h)}><${Icon} name="edit" size=${18} /></button><button class="icon-btn" onClick=${() => upd(w, { calendar: { ...cal, holidays: cal.holidays.filter(x => x.id !== h.id) } })}><${Icon} name="trash" size=${18} /></button></div>`)}</div>` : html`<p class="muted">لا شيء بعد.</p>`}
       <p class="muted small">هذه الأيام لا تُحتسب غياباً ولا تدخل في عدد الحصص، وتظهر مظللة في الكشوف.</p></div>
+  </div>`;
+}
+
+// ---------- فترات التقويم ----------
+const ORD = ['الأول', 'الثاني', 'الثالث', 'الرابع'];
+function splitTerm(t, n) {
+  // تقسيم الفصل إلى n فترات متساوية تقريباً على حدود الأسابيع (تبدأ الأحد)
+  const days = daysBetween(t.start, t.end) + 1, out = [];
+  let start = t.start;
+  for (let i = 0; i < n; i++) {
+    let end = i === n - 1 ? t.end : addDays(t.start, Math.round(days * (i + 1) / n) - 1);
+    if (i < n - 1) { const ws0 = weekStart(addDays(end, 1)); end = addDays(ws0, -1); if (end < start) end = addDays(start, 6); }
+    out.push({ id: uuid(), label: `التقويم ${ORD[i] || i + 1}`, start, end, cumulative: false });
+    start = addDays(end, 1);
+  }
+  return out;
+}
+function PeriodsCard({ w }) {
+  const cal = w.calendar || {}; const terms = cal.terms || [{}, {}];
+  const [ti, setTi] = useState(0);
+  const t = terms[ti] || {}; const ps = (t.periods || []).slice().sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  const save_ = async list => { const nt = terms.map((x, j) => j === ti ? { ...x, periods: list } : x); await upd(w, { calendar: { ...cal, terms: nt } }); };
+  const setP = (id, k, v) => save_(ps.map(p => p.id === id ? { ...p, [k]: v } : p));
+  const auto = async n => {
+    if (!t.start || !t.end) return toast('حدد بداية ونهاية الفصل الدراسي أولاً', 'warn');
+    if (ps.length && !await confirmDialog({ title: 'تقسيم تلقائي', message: 'ستُستبدل الفترات الحالية. التعديلات اليدوية والاعتمادات المرتبطة بالفترات القديمة لن تظهر في الفترات الجديدة.', okText: 'تقسيم' })) return;
+    await save_(splitTerm(t, n)); await audit('ضبط فترات التقويم', `الفصل الدراسي ${ti + 1}: ${n} فترات`);
+  };
+  const add = () => { const last = ps[ps.length - 1]; const start = last?.end ? addDays(last.end, 1) : (t.start || todayISO()); save_([...ps, { id: uuid(), label: `التقويم ${ORD[ps.length] || ps.length + 1}`, start, end: t.end && t.end >= start ? t.end : start, cumulative: false }]); };
+  const remove = async p => { if (await confirmDialog({ title: 'حذف الفترة', message: `حذف «${p.label}»؟ الأحداث والدرجات لا تُحذف؛ تبقى ضمن الفصل الدراسي.`, danger: true, okText: 'حذف' })) await save_(ps.filter(x => x.id !== p.id)); };
+  const issues = [];
+  ps.forEach((p, i) => {
+    if (p.end < p.start) issues.push(`«${p.label}»: النهاية قبل البداية`);
+    if (t.start && (p.start < t.start || p.end > t.end)) issues.push(`«${p.label}» تخرج عن تواريخ الفصل الدراسي`);
+    if (i && ps[i - 1].end >= p.start) issues.push(`«${ps[i - 1].label}» و«${p.label}» متداخلتان`);
+  });
+  return html`<div class="card stack">
+    <div class="row"><h2 style="margin:0">فترات التقويم</h2><span class="grow"></span><div class="chips">${[0, 1].map(i => html`<button class=${'chip' + (ti === i ? ' on' : '')} onClick=${() => setTi(i)}>الفصل ${i ? 'الثاني' : 'الأول'}</button>`)}</div></div>
+    <p class="muted small" style="margin:0">اختياري. قسّم الفصل الدراسي إلى فترات تقويم إن كنت ترفع تقييم الطالب أكثر من مرة. كل فترة تُحسب درجتها (40) من أحداثها ومهامها فقط، أو «تراكمياً» من بداية الفصل حتى نهايتها. بدون فترات تُحسب الدرجة على الفصل كاملاً.</p>
+    ${ps.length ? html`<div class="table-wrap"><table class="tbl"><thead><tr><th>الفترة</th><th>من</th><th>إلى</th><th>طريقة الحساب</th><th></th></tr></thead><tbody>
+      ${ps.map(p => html`<tr key=${p.id}><td><input value=${p.label} onChange=${e => setP(p.id, 'label', e.target.value.trim() || p.label)} style="min-width:130px" /></td>
+        <td><input type="date" value=${p.start} onChange=${e => setP(p.id, 'start', e.target.value)} /></td>
+        <td><input type="date" value=${p.end} onChange=${e => setP(p.id, 'end', e.target.value)} /></td>
+        <td><select value=${p.cumulative ? 'c' : 'n'} onChange=${e => setP(p.id, 'cumulative', e.target.value === 'c')} style="min-width:200px"><option value="n">مستقلة (من بداية الفترة)</option><option value="c">تراكمية (من بداية الفصل الدراسي)</option></select></td>
+        <td><button class="icon-btn" onClick=${() => remove(p)}><${Icon} name="trash" size=${16} /></button></td></tr>`)}
+    </tbody></table></div>` : null}
+    ${issues.length ? html`<div class="error small">${issues.join(' • ')}</div>` : null}
+    <div class="row"><button class="btn sm soft" onClick=${() => auto(2)}>تقسيم إلى فترتين</button><button class="btn sm soft" onClick=${() => auto(3)}>إلى ثلاث فترات</button><button class="btn sm ghost" onClick=${add}><${Icon} name="plus" size=${16} /> فترة</button>
+      ${ps.length ? html`<button class="btn sm ghost" onClick=${async () => { if (await confirmDialog({ title: 'إلغاء الفترات', message: 'ستعود الدرجة لتُحسب على الفصل الدراسي كاملاً.', okText: 'إلغاء الفترات' })) await save_([]); }}>إلغاء الفترات</button>` : null}</div>
   </div>`;
 }
 

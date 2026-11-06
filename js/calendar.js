@@ -19,6 +19,25 @@ export function currentTerm(ws, date) {
   const r2 = termRange(ws, 2);
   return r2 && date > r2.start ? 2 : 1;
 }
+// ---------- فترات التقويم داخل الفصل الدراسي ----------
+// كل فترة: { id, label, start, end, cumulative } — التراكمية تُحسب من بداية الفصل الدراسي حتى نهايتها
+export const TERM_LABEL = { 1: 'الفصل الدراسي الأول', 2: 'الفصل الدراسي الثاني' };
+export function evalPeriods(ws, term) {
+  return (ws?.calendar?.terms?.[term - 1]?.periods || []).filter(p => p.start && p.end).sort((a, b) => a.start.localeCompare(b.start));
+}
+export function evalRange(ws, term, pid = null) {
+  const r = termRange(ws, term); if (!r) return null;
+  const p = pid ? evalPeriods(ws, term).find(x => x.id === pid) : null;
+  if (!p) return { start: r.start, end: r.end, pid: null, label: TERM_LABEL[term], short: 'الفصل كاملاً' };
+  return { start: p.cumulative ? r.start : p.start, end: p.end, pid: p.id, cumulative: !!p.cumulative, label: `${TERM_LABEL[term]} — ${p.label}`, short: p.label };
+}
+// الفترة الافتراضية: الجارية اليوم، وإلا آخر فترة انتهت، وإلا الأولى
+export function defaultPeriod(ws, term, date) {
+  const ps = evalPeriods(ws, term); if (!ps.length) return null;
+  const cur = ps.find(p => date >= p.start && date <= p.end); if (cur) return cur.id;
+  const past = ps.filter(p => p.end < date);
+  return (past[past.length - 1] || ps[0]).id;
+}
 export const isWorkday = (ws, date) => (ws?.calendar?.workdays ?? [0, 1, 2, 3, 4]).includes(dow(date));
 export function holidayOn(ws, date) {
   return (ws?.calendar?.holidays || []).find(h => date >= h.from && date <= (h.to || h.from)) || null;

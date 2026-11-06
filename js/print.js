@@ -145,7 +145,7 @@ export function taskSheet({ taskId, classId, prefill = true }) {
 }
 
 // ---------- كشف تفصيل الدرجة (لطالب) ----------
-export function gradeBreakdownSheet({ student, cls, term, g, includeEvents = true }) {
+export function gradeBreakdownSheet({ student, cls, term, g, includeEvents = true, label = null }) {
   const cats = g.categories.map(c => `<div class="pr-box"><h4>${e(c.name)} — ${c.final == null ? 'غير مقيّمة بعد' : `${fmtNum(c.final)} من ${c.weight}`} <span class="pr-small">(طريقة الحساب: ${e(METHODS[c.method])})</span></h4>
       <div>${e(c.text)}</div>
       ${c.override ? `<div><b>تعديل يدوي:</b> المقترحة ${fmtNum(c.suggested)} ← المعتمدة ${fmtNum(c.final)} — السبب: ${e(c.override.reason)}</div>` : ''}
@@ -154,7 +154,7 @@ export function gradeBreakdownSheet({ student, cls, term, g, includeEvents = tru
         : `${fmtDate(it.date, 'g')}: ${e(it.title)} — ${it.excluded ? e(it.excluded) : `${fmtNum(it.earned)}/${it.max}${it.makeup ? ' (تعويضي)' : ''}`}`).join(' • ')}</div>` : ''}</div>`).join('');
   const m = g.monthly;
   const a = g.attendance;
-  return `<section class="pr-page">${header('كشف تفصيل الدرجة', [['الطالب', student.full_name], ['الفصل', className(cls)], ['الفصل الدراسي', term === 1 ? 'الأول' : 'الثاني'], ['تاريخ الطباعة', fmtDate(todayISO())]])}
+  return `<section class="pr-page">${header('كشف تفصيل الدرجة', [['الطالب', student.full_name], ['الفصل', className(cls)], ['الفترة', label || (term === 1 ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني')], ['تاريخ الطباعة', fmtDate(todayISO())]])}
     <div class="pr-box"><b>ملخص:</b> الدرجة الأدائية ${fmtNum(g.total)} من 40 • الاختبارات الشهرية ${m.final == null ? '—' : fmtNum(m.final)} من ${m.weight}
       • الحضور: حضر ${a.present + a.late} من ${a.sessions} حصة (تأخر ${a.late}، غياب بعذر ${a.absent_excused}، بدون عذر ${a.absent_unexcused})</div>
     ${cats}
@@ -165,12 +165,12 @@ export function gradeBreakdownSheet({ student, cls, term, g, includeEvents = tru
 }
 
 // ---------- كشف درجات الفصل ----------
-export function classGradesSheet({ cls, term, rows, scheme }) {
+export function classGradesSheet({ cls, term, rows, scheme, label = null }) {
   const cats = scheme.categories;
   const body = rows.map((x, i) => `<tr class="${x.active ? '' : 'left'}"><td>${e(x.student.seat_no || i + 1)}</td><td class="nm">${e(x.student.full_name)}</td>
     ${x.g.categories.map(c => `<td>${c.final == null ? '—' : fmtNum(c.final)}${c.override ? '*' : ''}</td>`).join('')}
     <td><b>${fmtNum(x.g.total)}</b></td><td>${x.g.monthly.final == null ? '—' : fmtNum(x.g.monthly.final)}</td><td><b>${fmtNum(x.g.grand)}</b></td></tr>`).join('');
-  return `<section class="pr-page">${header('كشف الدرجات الأدائية', [['الفصل', className(cls)], ['الفصل الدراسي', term === 1 ? 'الأول' : 'الثاني'], ['التاريخ', fmtDate(todayISO())]])}
+  return `<section class="pr-page">${header('كشف الدرجات الأدائية', [['الفصل', className(cls)], ['الفترة', label || (term === 1 ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني')], ['التاريخ', fmtDate(todayISO())]])}
     <table class="pr big"><colgroup><col style="width:9mm"><col style="width:60mm">${cats.map(() => '<col>').join('')}<col><col><col></colgroup>
     <thead><tr><th>م</th><th>اسم الطالب</th>${cats.map(c => `<th class="vt">${e(c.name)}<br>(${c.weight})</th>`).join('')}<th>الأدائية (40)</th><th>الشهري (${scheme.monthly?.outOf || 20})</th><th>المجموع</th></tr></thead><tbody>${body}</tbody></table>
     <div class="pr-small" style="margin-top:4px">* درجة معدلة يدوياً بسبب مسجّل.</div>

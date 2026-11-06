@@ -5,7 +5,7 @@ import { useStore, Icon, Avatar, Btn, Tabs, Empty, go, formDialog, confirmDialog
 import { setNid, transferStudent, withdrawStudent, reinstateStudent, mergeStudents, purgeStudent, voidEvent } from '../ops.js';
 import { HEALTH_FLAGS, TEACHER_TAGS, NOTE_KINDS, CONTACT_METHODS } from '../defaults.js';
 import { todayISO, fmtDate, compressImage, fmtNum } from '../utils.js';
-import { currentTerm } from '../calendar.js';
+import { currentTerm, defaultPeriod } from '../calendar.js';
 import { ATT_STATUS } from '../grading.js';
 import { workspace } from '../store.js';
 import { ReferralsList } from './forms.js';
@@ -26,7 +26,7 @@ export function StudentPage({ id, tab = 'profile' }) {
         <div class="sub">${className(cls)} • رقم ${st.seat_no || '—'} ${!active ? html` • <span class="badge neg">${st.status === 'withdrawn' ? 'منسحب' : 'غير مسجل حالياً'}</span>` : null}</div></div>
       <div class="actions">
         <button class="btn ghost" onClick=${() => patch('student_private', id, { ...pv, starred: !pv.starred })}><${Icon} name="star" /> ${pv.starred ? 'إلغاء المتابعة' : 'متابعة'}</button>
-        ${cls ? html`<a class="btn soft" href=${`#/grade/${cls.id}/${currentTerm(workspace(), todayISO())}/${id}`}><${Icon} name="grades" /> شرح الدرجة</a>` : null}
+        ${cls ? html`<a class="btn soft" href=${(() => { const t = currentTerm(workspace(), todayISO()); const p = defaultPeriod(workspace(), t, todayISO()); return `#/grade/${cls.id}/${t}/${id}${p ? '?p=' + p : ''}`; })()}><${Icon} name="grades" /> شرح الدرجة</a>` : null}
         <a class="btn" href=${'#/form/parent?student=' + id}><${Icon} name="users" /> تقرير ولي الأمر</a>
         <a class="btn" href=${'#/form/behavior?student=' + id}><${Icon} name="alert" /> رصد مشكلة سلوكية</a>
         <a class="btn" href=${'#/form/referral?student=' + id}><${Icon} name="file" /> إحالة</a>

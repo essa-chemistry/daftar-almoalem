@@ -62,7 +62,7 @@ export function referralSheet({ ref, reasonsAll }) {
 
 // ---------- تقرير ولي الأمر ----------
 // لا يتضمن الملاحظات الخاصة ولا التنبيهات الصحية ولا أي مقارنة بطلاب آخرين
-export function parentReportSheet({ st, cls, term, g, sections, stats, message, request }) {
+export function parentReportSheet({ st, cls, term, g, sections, stats, message, request, label = null }) {
   const id = workspace()?.identity || {};
   const a = g.attendance;
   const parts = [];
@@ -73,7 +73,7 @@ export function parentReportSheet({ st, cls, term, g, sections, stats, message, 
   if (sections.behavior) parts.push(`<div class="pr-box"><h4>السلوك</h4>${stats.behavior.length ? stats.behavior.map(b => `${e(b.name)}: ${b.count}`).join(' • ') : 'لا توجد ملاحظات سلوكية مسجلة — شكراً لانضباطه.'}</div>`);
   if (sections.grade) parts.push(`<div class="pr-box"><h4>الدرجة الأدائية: ${fmtNum(g.total)} من 40${g.monthly.final != null ? ` • الاختبارات الشهرية: ${fmtNum(g.monthly.final)} من ${g.monthly.weight}` : ''}</h4>
     ${sections.breakdown ? `<table class="pr"><thead><tr><th>الفئة</th><th>الوزن</th><th>الدرجة</th></tr></thead><tbody>${g.categories.map(c => `<tr><td style="text-align:right">${e(c.name)}</td><td>${c.weight}</td><td>${c.final == null ? '—' : fmtNum(c.final)}</td></tr>`).join('')}</tbody></table>` : ''}</div>`);
-  return `<section class="pr-page">${header('تقرير ولي الأمر', [['الطالب', st.full_name], ['الفصل', className(cls)], ['الفصل الدراسي', term === 1 ? 'الأول' : 'الثاني'], ['التاريخ', fmtDate(todayISO())]])}
+  return `<section class="pr-page">${header('تقرير ولي الأمر', [['الطالب', st.full_name], ['الفصل', className(cls)], ['الفترة', label || (term === 1 ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني')], ['التاريخ', fmtDate(todayISO())]])}
     <div class="pr-box">المكرم ولي أمر الطالب / <b>${e(st.full_name)}</b> &nbsp; حفظه الله<br>السلام عليكم ورحمة الله وبركاته، نضع بين أيديكم ملخص مستوى ابنكم في مادة ${e(id.subject || 'الكيمياء')}.</div>
     ${parts.join('')}
     ${message ? `<div class="pr-box"><h4>رسالة المعلم</h4><div class="pr-pre">${e(message)}</div></div>` : ''}

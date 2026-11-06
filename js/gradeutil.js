@@ -1,7 +1,7 @@
 // ربط محرك الدرجات بالمخزن: يجمع مدخلات الطالب ثم يستدعي grading.js
 import { S, all, ws, get, workspace, calCtx, roster } from './store.js';
 import { computeStudent, defaultScheme } from './grading.js';
-import { termRange, plannedCount } from './calendar.js';
+import { evalRange, plannedCount } from './calendar.js';
 import { todayISO } from './utils.js';
 
 export function schemeFor(grade, term) {
@@ -16,13 +16,14 @@ export function plannedFor(classId, term) {
   return plannedCache.get(k);
 }
 
-export function gradeStudent(studentId, classId, term, { today = todayISO() } = {}) {
+// pid: فترة التقويم (null = الفصل الدراسي كاملاً). هدف المشاركة يبقى للفصل كاملاً ويُقسَّم بنسبة ما حضره الطالب في الفترة
+export function gradeStudent(studentId, classId, term, { today = todayISO(), pid = null } = {}) {
   const w = workspace(); const cls = get('classes', classId);
-  const r = termRange(w, term);
+  const r = evalRange(w, term, pid);
   if (!r || !cls) return null;
   const sessions = ws('sessions', s => s.class_id === classId);
   return computeStudent({
-    term: r, today,
+    term: { start: r.start, end: r.end }, today,
     enrollments: all('enrollments', e => e.student_id === studentId && e.class_id === classId),
     sessions, plannedSessions: plannedFor(classId, term),
     attendance: all('attendance', a => a.student_id === studentId && a.class_id === classId),
@@ -31,16 +32,17 @@ export function gradeStudent(studentId, classId, term, { today = todayISO() } = 
     tasks: ws('tasks', t => (t.class_ids || []).includes(classId)),
     results: all('task_results', x => x.student_id === studentId),
     scheme: schemeFor(cls.grade, term),
-    overrides: all('grade_overrides', o => o.student_id === studentId && o.class_id === classId && +o.term === +term),
+    overrides: all('grade_overrides', o => o.student_id === studentId && o.class_id === classId && +o.term === +term && (o.period || null) === r.pid),
   });
 }
 
 // كل طلاب الفصل الذين كانوا مسجلين في أي وقت خلال الفصل الدراسي
-export function classGradeRows(classId, term) {
-  const w = workspace(); const r = termRange(w, term); if (!r) return [];
+export function classGradeRows(classId, term, pid = null) {
+  const w = workspace(); const r = evalRange(w, term, pid); if (!r) return [];
   const ids = new Set(all('enrollments', e => e.class_id === classId && e.start_date <= r.end && (!e.end_date || e.end_date >= r.start)).map(e => e.student_id));
   const list = roster(classId, todayISO(), { includeLeft: true }).filter(x => ids.has(x.student.id));
   for (const id of ids) if (!list.some(x => x.student.id === id)) { const s = get('students', id); if (s) list.push({ student: s, active: false }); }
-  return list.map(x => ({ ...x, g: gradeStudent(x.student.id, classId, term) }));
+  return list.map(x => ({ ...x, g: gradeStudent(x.student.id, classId, term, { pid: r.pid }) }));
 }
-export const lockFor = (classId, term) => ws('grade_locks', l => l.class_id === classId && +l.term === +term && l.active !== false)[0] || null;
+export const lockFor = (classId, term, pid = null) => ws('grade_locks', l => l.class_id === classId && +l.term === +term && (l.period || null) === (pid || null) && l.active !== false)[0] || null;
+export { evalRange };
