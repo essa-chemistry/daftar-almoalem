@@ -1,5 +1,5 @@
 // المرحلة 2 — الإدخال السريع من الكشف الورقي: نفس شكل كشف المتابعة، تُكتب الرموز في الخلايا فتتحول لأحداث بتاريخ الحصة
-import { html, useState, useRef } from '../lib.js';
+import { html, useState, useRef, useEffect } from '../lib.js';
 import { get, all, save, audit, classes, className, roster, calCtx, findSession, sessionAttendance, sessionEvents, eventTypes, enrollmentsOf, isEnrolledOn } from '../store.js';
 import { useStore, Icon, Btn, Empty, toast } from '../ui.js';
 import { meetingsRange, isHeldStatus } from '../calendar.js';
@@ -54,6 +54,13 @@ export function PaperEntryPage({ q = {} }) {
   const [vals, setVals] = useState({});
   const [focus, setFocus] = useState(null);
   const inputs = useRef({});
+  const pageRef = useRef(null); const barRef = useRef(null);
+  // ارتفاع شريط الرموز المثبّت ← ليملأ الجدول باقي الشاشة ويبقى رأسه ظاهراً
+  useEffect(() => {
+    const bar = barRef.current, pg = pageRef.current; if (!bar || !pg || !window.ResizeObserver) return;
+    const ro = new ResizeObserver(() => pg.style.setProperty('--pbar', bar.offsetHeight + 'px'));
+    ro.observe(bar); return () => ro.disconnect();
+  }, [cls.length]);
   if (!cls.length) return html`<div class="page"><${Empty} title="لا توجد فصول" /></div>`;
   const to = addDays(from, 7 * weeks - 1);
   const map = codeMap();
@@ -111,7 +118,13 @@ export function PaperEntryPage({ q = {} }) {
   const wk = []; for (const m of ms) { const s0 = weekStart(m.date); let g = wk.find(x => x.s === s0); if (!g) wk.push(g = { s: s0, items: [] }); g.items.push(m); }
   const cols = wk.flatMap((g, gi) => g.items.map((m, i) => ({ ...m, first: i === 0, gi })));
   const fParse = focus && vals[focus] ? parseCodes(vals[focus], map) : null;
-  return html`<div class="page">
+  const focusLabel = (() => {
+    if (!focus) return '';
+    const [date, period, sid] = focus.split('|');
+    const st = rows.find(x => x.student.id === sid)?.student; if (!st) return '';
+    return `${st.full_name} — ${DAY_SHORT[dow(date)]} ${fmtShort(date)} ح${period}`;
+  })();
+  return html`<div class="page paper-page" ref=${pageRef}>
     <div class="page-head"><a class="icon-btn" href="#/print"><${Icon} name="back" /></a><div><h1>الإدخال من الكشف الورقي</h1><div class="sub">اكتب الرموز كما في الكشف المطبوع؛ تتحول إلى أحداث بتاريخ الحصة الصحيح. مثال: «2ص ن» = إجابتان صحيحتان ونوم.</div></div>
       <div class="actions"><${Btn} cls="primary" disabled=${!filled.length} onClick=${doSave}><${Icon} name="check" /> حفظ ${filled.length ? `(${filled.length} خلية)` : ''}</${Btn}></div></div>
     ${ms.length && !heldPast.length && future ? html`<div class="notice" style="margin-bottom:12px">هذه الفترة لم تأتِ بعد، والإدخال متاح فقط للحصص التي انعقدت. اضغط «الأسبوع السابق».</div>` : null}
@@ -121,14 +134,20 @@ export function PaperEntryPage({ q = {} }) {
       <label class="row small">أسبوع يبدأ <input type="date" style="width:170px" value=${from} onChange=${e => { setFrom(weekStart(e.target.value)); setVals({}); }} /></label>
       <button class="btn sm" onClick=${() => { setFrom(addDays(from, -7)); setVals({}); }}>الأسبوع السابق</button><button class="btn sm" onClick=${() => { setFrom(addDays(from, 7)); setVals({}); }}>التالي</button>
       <label class="row small">عدد الأسابيع <select style="width:80px" value=${weeks} onChange=${e => setWeeks(+e.target.value)}>${[1, 2, 3, 4].map(n => html`<option value=${n}>${n}</option>`)}</select></label></div>
-      <div class="chips" style="margin-top:10px">${[...map.entries()].map(([c, x]) => html`<button class=${'chip'} onMouseDown=${e => e.preventDefault()} onClick=${() => insert(c)} title=${x.t.name}><b>${c}</b> ${x.t.name}</button>`)}</div>
-      ${fParse ? html`<div class=${fParse.bad.length ? 'error small' : 'info small'} style="margin-top:8px">${fParse.items.map(i => `${i.n > 1 ? i.n + '× ' : ''}${i.t.name}`).join('، ') || '—'}${fParse.bad.length ? ` — غير معروف: ${fParse.bad.join(' ')}` : ''}</div>` : null}
+      <p class="muted small" style="margin:8px 0 0">شريط الرموز ورأس الجدول يبقيان ظاهرين أثناء التمرير. الرمادي الصغير في الخلية = ما سُجّل سابقاً (المكتوب يُضاف إليه). الخلايا المظللة: إجازة أو حصة ملغاة أو طالب غير مسجل أو تاريخ لاحق. Enter ينقلك للطالب التالي.</p>
+    </div>
+    <div class="paper-bar" ref=${barRef}>
+      <div class="chips paper-chips">${[...map.entries()].map(([c, x]) => html`<button class=${'chip'} onMouseDown=${e => e.preventDefault()} onClick=${() => insert(c)} title=${x.t.name}><b>${c}</b> ${x.t.name}</button>`)}</div>
+      <div class="paper-status">
+        <div class=${'small ' + (fParse?.bad.length ? 'error' : 'info')}>${focusLabel ? html`<b>${focusLabel}</b>: ` : null}${fParse ? html`${fParse.items.map(i => `${i.n > 1 ? i.n + '× ' : ''}${i.t.name}`).join('، ') || '—'}${fParse.bad.length ? ` — غير معروف: ${fParse.bad.join(' ')}` : ''}` : focusLabel ? '—' : 'اختر خلية ثم اكتب الرمز أو اضغطه من الأعلى'}</div>
+        <${Btn} cls="primary sm" disabled=${!filled.length} onClick=${doSave}><${Icon} name="check" /> حفظ ${filled.length ? `(${filled.length})` : ''}</${Btn}>
+      </div>
     </div>
     ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص لهذا الفصل في هذه الفترة">${timetables()[0] && timetables()[0].effective_from > from ? html`<span>الجدول الأسبوعي ساري من ${fmtShort(timetables()[0].effective_from)} فقط، فلا تظهر حصص قبله. عدّل تاريخه من <a href="#/settings/timetable">الإعدادات ← الجدول ← «تعديل تاريخ السريان»</a> إلى بداية الفصل الدراسي.</span>` : !timetables().length ? html`<span>لم يُضبط الجدول الأسبوعي بعد. <a href="#/settings/timetable">اضبطه من الإعدادات</a>.</span>` : html`<span>تحقق من أن الأسبوع داخل تواريخ الفصل الدراسي، ومن أن الفصل له حصص في الجدول.</span>`}</${Empty}></div>` : html`
-    <div class="table-wrap"><table class="tbl paper-grid">
-      <thead><tr><th rowspan="2">م</th><th rowspan="2">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">الأسبوع ${fmtShort(g.s)}</th>`)}</tr>
+    <div class="table-wrap paper-wrap"><table class="tbl paper-grid">
+      <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">الأسبوع ${fmtShort(g.s)}</th>`)}</tr>
         <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br />ح${m.period}</th>`)}</tr></thead>
-      <tbody>${rows.map((x, ri) => html`<tr><td class="num">${x.student.seat_no || ri + 1}</td><td style="white-space:nowrap">${x.student.full_name}</td>
+      <tbody>${rows.map((x, ri) => html`<tr><td class="num">${x.student.seat_no || ri + 1}</td><td class="pname">${x.student.full_name}</td>
         ${cols.map(m => {
           const enr = enrollmentsOf(x.student.id).some(e => e.class_id === cid && isEnrolledOn(e, m.date));
           const ok = enr && isHeldStatus(m.status) && m.date <= today;
@@ -138,7 +157,6 @@ export function PaperEntryPage({ q = {} }) {
           return html`<td class=${'pcell' + (m.first ? ' wk-sep' : '') + (ok ? '' : ' shaded')}>${ok ? html`${rec ? html`<span class="rec" title="مسجّل سابقاً">${rec}</span>` : null}<input class=${bad ? 'bad' : v ? 'good' : ''} value=${v} ref=${el => { inputs.current[k] = el; }}
             onFocus=${() => setFocus(k)} onInput=${e => setV(k, autocomplete(e.target.value, map))}
             onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); move(k, e.shiftKey ? -1 : 1); } }} />` : null}</td>`;
-        })}</tr>`)}</tbody></table></div>
-    <p class="muted small">الرمادي الصغير = ما سُجّل سابقاً في الحصة (لا يتكرر، والمكتوب يُضاف إليه). الخلايا المظللة: إجازة أو حصة ملغاة أو غير مسجل أو تاريخ لاحق. Enter ينقلك للطالب التالي.</p>`}
+        })}</tr>`)}</tbody></table></div>`}
   </div>`;
 }

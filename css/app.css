@@ -424,3 +424,26 @@ body.floating { background: var(--surface); }
 .floating-picker .picker .pname { font-size: 1.6rem; }
 .floating-picker .outcomes .btn { min-height: 56px; }
 @media (max-width: 640px) { .seatcell { min-height: 76px; } }
+
+/* الإدخال من الكشف الورقي: شريط رموز مثبت + جدول برأس ثابت */
+.paper-bar { position: sticky; top: 62px; z-index: 12; margin-bottom: 10px; padding: 10px 12px; border-radius: 18px; border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface) 92%, transparent); backdrop-filter: blur(10px); box-shadow: 0 6px 18px -12px rgb(0 0 0 / .35); }
+.paper-status { display: flex; align-items: center; gap: 10px; margin-top: 8px; min-height: 34px; }
+.paper-status > div { flex: 1; min-width: 0; padding: 6px 10px; border-radius: 10px; margin: 0; }
+.paper-wrap { max-height: calc(100dvh - 62px - var(--pbar, 130px) - 10px - 24px); min-height: 260px; scroll-padding-top: 76px; }
+.paper-page { padding-bottom: 22px; }
+.paper-status > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.paper-grid thead tr:first-child th { height: 30px; box-sizing: border-box; top: 0; z-index: 3; }
+.paper-grid thead tr:nth-child(2) th { top: 30px; z-index: 3; }
+.paper-grid .pname { white-space: nowrap; position: sticky; inset-inline-start: 0; background: var(--surface); z-index: 2; box-shadow: inset -1px 0 0 var(--line); }
+.paper-grid thead th.pname { background: var(--surface-2); z-index: 4; }
+.paper-grid td.pcell input { scroll-margin-top: 80px; }
+@media (max-width: 860px) {
+  .paper-bar { top: 54px; padding: 8px; }
+  .paper-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+  .paper-chips .chip { flex: none; }
+  .paper-page { padding-bottom: 96px; }
+  .paper-wrap { max-height: calc(100dvh - 54px - var(--pbar, 110px) - 10px - 98px); }
+}
+.paper-grid { border-collapse: separate; border-spacing: 0; }
+.table-wrap.paper-wrap { padding: 0; }
