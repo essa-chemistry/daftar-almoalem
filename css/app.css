@@ -458,3 +458,14 @@ body.floating { background: var(--surface); }
 .plan-tbl tr.pk-activity td, .tbl tr.pk-activity td { background: var(--warn-bg); }
 .tbl tr.wk-top td { border-top: 2px solid var(--line-strong, var(--line)); }
 .plan-tbl td { vertical-align: top; }
+
+/* شريط الخطة في الحصة */
+.plan-bar { flex-direction: column; align-items: stretch; }
+.plan-bar .pb-main, .plan-bar .pb-side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.plan-bar .pb-lbl { font-weight: 700; white-space: nowrap; }
+.plan-bar .pb-sel { flex: 1 1 280px; width: auto; min-width: 0; max-width: 100%; min-height: 38px; font-weight: 700; }
+.plan-bar .pb-topic { padding: 3px 10px; border-radius: 10px; background: var(--primary-soft); color: var(--primary-strong); }
+
+.wk-sel { width: auto; min-width: 260px; max-width: 100%; }
+.paper-grid .wk-h .wk-d { font-weight: 400; opacity: .8; font-size: .78rem; margin-inline-start: 6px; }
+.paper-grid th .hj { font-weight: 400; color: var(--muted); font-size: .74rem; }

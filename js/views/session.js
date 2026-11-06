@@ -5,7 +5,7 @@ import { useStore, Icon, Avatar, Btn, openModal, ModalHead, toast, formDialog, c
 import { setAttendance, addEvent, voidEvent, openSession, deleteSession, sessionContents } from '../ops.js';
 import { choose } from '../picker.js';
 import { periodInfo, termOf } from '../calendar.js';
-import { plannedFor, progress } from '../plan.js';
+import { plannedFor, progress, units as planUnits, planPositions, unitIndexOf } from '../plan.js';
 import { statusText, statusCls } from './plan.js';
 import { SeatGrid, seatMapOf } from './seatmap.js';
 import { printHTML, sessionSheet } from '../print.js';
@@ -419,22 +419,44 @@ export async function openFloatingPicker(sessionId) {
   return true;
 }
 
-// ---------- الخطة: الدرس المخطط لهذه الحصة وزر «تم الشرح» ----------
+// ---------- الخطة: درس هذه الحصة (حسب التوزيع أو يحدده المعلم) وزر «تم الشرح» ----------
 function PlanBar({ s }) {
   const w = workspace(); const term = termOf(w, s.date);
   if (!term) return null;
+  const cls = get('classes', s.class_id);
   const prog = progress(s.class_id, term);
   if (!prog.total) return null;
-  const planned = s.period ? plannedFor(s.class_id, term, s.date, s.period) : null;
+  const us = planUnits(cls.grade, term);
+  const planned = plannedFor(s.class_id, term, s.date, s.period);
+  const pIdx = unitIndexOf(us, planned);
+  const pos = planPositions(s.class_id, term);
+  const before = pos.at.get(s.id) ?? pos.done;
+  // قبل أن يحدد المعلم موضعه أول مرة: تفتح الحصة على الدرس المخطط لتاريخها
+  const cur = Math.min(us.length - 1, s.plan_at != null ? +s.plan_at : !pos.anchored && pIdx >= 0 ? pIdx : before);
+  const u = us[cur];
   const n = Math.max(1, +s.plan_units || 1);
-  const toggle = () => patch('sessions', s.id, { plan_done: !s.plan_done, plan_units: n, plan_lesson_id: !s.plan_done ? prog.next?.lesson.id || null : null });
+  const setCur = i => patch('sessions', s.id, { plan_at: +i, ...(s.plan_done ? { plan_lesson_id: us[+i]?.lesson.id || null } : {}) });
+  const toggle = () => patch('sessions', s.id, s.plan_done ? { plan_done: false, plan_lesson_id: null } : { plan_done: true, plan_units: n, plan_at: cur, plan_lesson_id: u?.lesson.id || null });
+  const setTopic = async () => {
+    const v = await formDialog({ title: 'عنوان الحصة', fields: [{ name: 'topic', label: 'العنوان', value: s.topic || '', placeholder: 'مثال: مراجعة، اختبار قصير، نشاط عملي', full: true }], okText: 'حفظ' });
+    if (v) await patch('sessions', s.id, { topic: v.topic.trim() || null });
+  };
+  const lbl = x => `${x.lesson.title}${x.of > 1 ? ` (${x.k}/${x.of})` : ''}`;
   return html`<div class="plan-bar">
-    <span>📘 المخطط لهذه الحصة: <b>${planned ? planned.lesson.title : '—'}</b>${planned && planned.of > 1 ? html` <span class="muted small">(${planned.k}/${planned.of})</span>` : null}</span>
-    ${prog.next && (!planned || prog.next.lesson.id !== planned.lesson.id) ? html`<span>التالي فعلياً: <b>${prog.next.lesson.title}</b></span>` : null}
-    <span class=${'badge ' + statusCls(prog)}>${statusText(prog)}</span>
-    <span class="grow"></span>
-    ${s.plan_done ? html`<select style="width:auto;min-height:36px" value=${n} onChange=${e => patch('sessions', s.id, { plan_units: +e.target.value })}>${[1, 2, 3].map(k => html`<option value=${k}>${k === 1 ? 'حصة واحدة' : k + ' حصص من الخطة'}</option>`)}</select>` : null}
-    <button class=${'btn sm ' + (s.plan_done ? 'primary' : 'soft')} onClick=${toggle}>${s.plan_done ? '✓ تم الشرح' : 'تم الشرح'}</button>
+    <div class="pb-main">
+      <span class="pb-lbl">📘 درس الحصة:</span>
+      <select class="pb-sel" value=${cur} onChange=${e => setCur(e.target.value)} title="اختر الدرس الذي تشرحه في هذه الحصة">
+        ${us.map((x, i) => html`<option value=${i}>${lbl(x)}${i === pIdx ? '  ← حسب التوزيع' : ''}</option>`)}</select>
+      ${s.topic ? html`<b class="pb-topic">${s.topic}</b>` : null}
+      <button class="btn sm ghost" onClick=${setTopic}><${Icon} name="edit" size=${15} /> ${s.topic ? 'تعديل العنوان' : 'عنوان آخر'}</button>
+    </div>
+    <div class="pb-side">
+      ${planned && pIdx !== cur ? html`<span class="small">حسب التوزيع: <b>${lbl(planned)}</b> <button class="btn sm soft" onClick=${() => setCur(pIdx)}>اعتماده</button></span>` : planned ? html`<span class="badge pos">مطابق للتوزيع</span>` : null}
+      <span class=${'badge ' + statusCls(prog)}>${statusText(prog)}</span>
+      <span class="grow"></span>
+      ${s.plan_done ? html`<select style="width:auto;min-height:36px" value=${n} onChange=${e => patch('sessions', s.id, { plan_units: +e.target.value })}>${[1, 2, 3].map(k => html`<option value=${k}>${k === 1 ? 'حصة واحدة' : k + ' حصص من الخطة'}</option>`)}</select>` : null}
+      <button class=${'btn sm ' + (s.plan_done ? 'primary' : 'soft')} onClick=${toggle}>${s.plan_done ? '✓ تم الشرح' : 'تم الشرح'}</button>
+    </div>
   </div>`;
 }
 

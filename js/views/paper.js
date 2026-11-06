@@ -2,7 +2,9 @@
 import { html, useState, useRef, useEffect } from '../lib.js';
 import { get, all, save, audit, classes, className, roster, calCtx, findSession, sessionAttendance, sessionEvents, eventTypes, enrollmentsOf, isEnrolledOn } from '../store.js';
 import { useStore, Icon, Btn, Empty, toast } from '../ui.js';
-import { meetingsRange, isHeldStatus } from '../calendar.js';
+import { meetingsRange, isHeldStatus, TERM_LABEL } from '../calendar.js';
+import { studyWeeks, weekOfDate, fmtH } from '../plan.js';
+import { workspace } from '../store.js';
 import { timetables } from '../store.js';
 import { setAttendance, addEvent } from '../ops.js';
 import { todayISO, weekStart, addDays, DAY_SHORT, dow, fmtShort, normDigits } from '../utils.js';
@@ -117,6 +119,13 @@ export function PaperEntryPage({ q = {} }) {
   // تجميع بالأسبوع
   const wk = []; for (const m of ms) { const s0 = weekStart(m.date); let g = wk.find(x => x.s === s0); if (!g) wk.push(g = { s: s0, items: [] }); g.items.push(m); }
   const cols = wk.flatMap((g, gi) => g.items.map((m, i) => ({ ...m, first: i === 0, gi })));
+  const W = workspace();
+  const weeksOf = { 1: studyWeeks(W, 1), 2: studyWeeks(W, 2) };
+  const allWeeks = [...weeksOf[1], ...weeksOf[2]];
+  const curWk = allWeeks.find(x => x.from === from);
+  const hd = iso => { const [, m, d] = fmtH(iso).split('/'); return `${+d}/${+m}`; };
+  const wkLabel = x => `${x.n ? 'الأسبوع ' + x.n : 'إجازة' + (x.off?.label ? ': ' + x.off.label : '')} — ${fmtShort(x.start)}–${fmtShort(x.end)} | ${hd(x.start)}–${hd(x.end)}هـ`;
+  const wkName = s0 => { const x = allWeeks.find(y => y.from === s0); return x ? (x.n ? `الأسبوع ${x.n}` : 'إجازة') : `أسبوع ${fmtShort(s0)}`; };
   const fParse = focus && vals[focus] ? parseCodes(vals[focus], map) : null;
   const focusLabel = (() => {
     if (!focus) return '';
@@ -131,7 +140,11 @@ export function PaperEntryPage({ q = {} }) {
     ${heldPast.length && lateDate && lateStart.length >= nowRoster.length / 2 ? html`<div class="notice" style="margin-bottom:12px">أغلب الطلاب مسجلون في الفصل من ${fmtShort(lateDate)} فقط، فالخلايا قبل هذا التاريخ مظللة. إن كانوا معك من بداية الفصل الدراسي فعدّل التاريخ من <a href=${'#/class/' + cid}>صفحة الفصل ← «تاريخ التحاق الطلاب»</a>.</div>` : null}
     <div class="card" style="margin-bottom:12px"><div class="row">
       <select style="max-width:220px" value=${cid} onChange=${e => { setCid(e.target.value); setVals({}); }}>${cls.map(c => html`<option value=${c.id}>${className(c)}</option>`)}</select>
-      <label class="row small">أسبوع يبدأ <input type="date" style="width:170px" value=${from} onChange=${e => { setFrom(weekStart(e.target.value)); setVals({}); }} /></label>
+      <label class="row small">الأسبوع <select class="wk-sel" value=${from} onChange=${e => { setFrom(e.target.value); setVals({}); }}>
+        ${!curWk ? html`<option value=${from}>خارج الفصل الدراسي — ${fmtShort(from)}</option>` : null}
+        ${[1, 2].map(t => { const list = weeksOf[t]; return list.length ? html`<optgroup label=${TERM_LABEL[t]}>${list.map(x => html`<option value=${x.from}>${wkLabel(x)}</option>`)}</optgroup>` : null; })}
+      </select></label>
+      <label class="row small muted">أو بالتاريخ <input type="date" style="width:150px" value=${from} onChange=${e => { if (e.target.value) { setFrom(weekStart(e.target.value)); setVals({}); } }} /></label>
       <button class="btn sm" onClick=${() => { setFrom(addDays(from, -7)); setVals({}); }}>الأسبوع السابق</button><button class="btn sm" onClick=${() => { setFrom(addDays(from, 7)); setVals({}); }}>التالي</button>
       <label class="row small">عدد الأسابيع <select style="width:80px" value=${weeks} onChange=${e => setWeeks(+e.target.value)}>${[1, 2, 3, 4].map(n => html`<option value=${n}>${n}</option>`)}</select></label></div>
       <p class="muted small" style="margin:8px 0 0">شريط الرموز ورأس الجدول يبقيان ظاهرين أثناء التمرير. الرمادي الصغير في الخلية = ما سُجّل سابقاً (المكتوب يُضاف إليه). الخلايا المظللة: إجازة أو حصة ملغاة أو طالب غير مسجل أو تاريخ لاحق. Enter ينقلك للطالب التالي.</p>
@@ -145,8 +158,8 @@ export function PaperEntryPage({ q = {} }) {
     </div>
     ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص لهذا الفصل في هذه الفترة">${timetables()[0] && timetables()[0].effective_from > from ? html`<span>الجدول الأسبوعي ساري من ${fmtShort(timetables()[0].effective_from)} فقط، فلا تظهر حصص قبله. عدّل تاريخه من <a href="#/settings/timetable">الإعدادات ← الجدول ← «تعديل تاريخ السريان»</a> إلى بداية الفصل الدراسي.</span>` : !timetables().length ? html`<span>لم يُضبط الجدول الأسبوعي بعد. <a href="#/settings/timetable">اضبطه من الإعدادات</a>.</span>` : html`<span>تحقق من أن الأسبوع داخل تواريخ الفصل الدراسي، ومن أن الفصل له حصص في الجدول.</span>`}</${Empty}></div>` : html`
     <div class="table-wrap paper-wrap"><table class="tbl paper-grid">
-      <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">الأسبوع ${fmtShort(g.s)}</th>`)}</tr>
-        <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br />ح${m.period}</th>`)}</tr></thead>
+      <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">${wkName(g.s)} <span class="wk-d">${fmtShort(g.s)} | ${hd(g.s)}هـ</span></th>`)}</tr>
+        <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}هـ</span><br />ح${m.period}</th>`)}</tr></thead>
       <tbody>${rows.map((x, ri) => html`<tr><td class="num">${x.student.seat_no || ri + 1}</td><td class="pname">${x.student.full_name}</td>
         ${cols.map(m => {
           const enr = enrollmentsOf(x.student.id).some(e => e.class_id === cid && isEnrolledOn(e, m.date));

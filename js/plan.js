@@ -82,16 +82,31 @@ function passed(m, today, now) {
   const p = (workspace()?.day?.periods || []).find(x => x.n === m.period);
   return p ? now >= parseHM(p.end) : false;
 }
-export const doneUnits = (classId, term) => sessionsOf(classId, term).reduce((a, s) => a + (s.plan_done ? Math.max(1, +s.plan_units || 1) : 0), 0);
+// موضع الشعبة في الخطة: يُحسب بالمرور على الحصص بترتيبها؛ plan_at في حصة = «الدرس في هذه الحصة» كما حدده المعلم
+// ثم «تم الشرح» يقدّم الموضع بعدد حصصه. at = الموضع عند بداية كل حصة
+export function planPositions(classId, term) {
+  const ss = sessionsOf(classId, term).sort((a, b) => a.date.localeCompare(b.date) || (a.period || 99) - (b.period || 99) || (a.created_at || '').localeCompare(b.created_at || ''));
+  // موضع حدده المعلم من صفحة الخطة: يُعامل كحصة افتراضية في نهاية يوم التحديد
+  const set = get('classes', classId)?.plan_set?.[term];
+  if (set) { const i = ss.findIndex(x => x.date > set.date); ss.splice(i < 0 ? ss.length : i, 0, { id: '__set', plan_at: set.pos }); }
+  let pos = 0, anchored = false; const at = new Map();
+  for (const s of ss) {
+    if (s.plan_at != null) { pos = Math.max(0, +s.plan_at); anchored = true; }
+    at.set(s.id, pos);
+    if (s.plan_done) pos += Math.max(1, +s.plan_units || 1);
+  }
+  return { done: pos, at, anchored };
+}
+export const doneUnits = (classId, term) => planPositions(classId, term).done;
 export function progress(classId, term) {
   const { meetings, units: us, rows, unassigned = 0 } = distribution(classId, term);
   const today = todayISO(), now = nowMinutes();
-  const done = doneUnits(classId, term);
+  const pp = planPositions(classId, term); const done = pp.done; const tracked = pp.anchored || done > 0;
   const plannedSoFar = rows.filter(r => r.unit && passed(r, today, now)).length;
   const diff = Math.min(done, us.length) - plannedSoFar; // موجب = متقدم، سالب = متأخر
   return {
     total: us.length, available: meetings.length, done: Math.min(done, us.length), plannedSoFar, diff,
-    next: us[Math.min(done, us.length)] || null, status: !us.length ? 'none' : diff >= 1 ? 'ahead' : diff <= -1 ? 'behind' : 'ontrack',
+    next: us[Math.min(done, us.length)] || null, tracked, status: !us.length ? 'none' : !tracked ? 'untracked' : diff >= 1 ? 'ahead' : diff <= -1 ? 'behind' : 'ontrack',
     shortfall: unassigned, // عدد الحصص التي لم تجد حصة متاحة
     spare: rows.filter(r => !r.unit).length,
   };
@@ -99,8 +114,12 @@ export function progress(classId, term) {
 // الدرس المخطط لحصة معينة
 export function plannedFor(classId, term, date, period) {
   const { rows } = distribution(classId, term);
-  return rows.find(r => r.date === date && r.period === period)?.unit || null;
+  if (period) return rows.find(r => r.date === date && r.period === period)?.unit || null;
+  // حصة يدوية: أول درس مخطط من هذا اليوم فصاعداً
+  return rows.find(r => r.date >= date && r.unit)?.unit || null;
 }
+// رقم الوحدة (0..) لدرس/جزء معين في قائمة الوحدات
+export const unitIndexOf = (us, u) => (u ? us.findIndex(x => x.lesson.id === u.lesson.id && x.k === u.k) : -1);
 // ملخص لكل درس: أول وآخر حصة مخططة
 export function lessonSpans(classId, term) {
   const { rows } = distribution(classId, term); const m = new Map();

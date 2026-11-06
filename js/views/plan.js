@@ -2,14 +2,14 @@
 import { html, useState } from '../lib.js';
 import { ws, get, save, saveMany, patch, purge, audit, classes, className, workspace } from '../store.js';
 import { useStore, Icon, Btn, Empty, formDialog, confirmDialog, toast, openModal, ModalHead } from '../ui.js';
-import { lessonsFor, progress, lessonSpans, lessonDone, kindOf, KIND_LABEL, studyWeeks, plannedRange, distribution, parsePlanRows, TEMPLATE_HEAD, fmtH, planMode, weekOfDate } from '../plan.js';
+import { units, unitIndexOf, lessonsFor, progress, lessonSpans, lessonDone, kindOf, KIND_LABEL, studyWeeks, plannedRange, distribution, parsePlanRows, TEMPLATE_HEAD, fmtH, planMode, weekOfDate } from '../plan.js';
 import { planSheet, distributionSheet } from '../planprint.js';
 import { printHTML } from '../print.js';
 import { currentTerm, termRange, TERM_LABEL, holidayOn } from '../calendar.js';
 import { todayISO, getXLSX, normDigits, fmtShort, GRADE_NAMES, DAY_SHORT, dow, uuid } from '../utils.js';
 
-export const statusText = p => p.status === 'none' ? 'لا توجد خطة' : p.diff === 0 ? 'وفق الخطة' : p.diff > 0 ? `متقدم ${p.diff} حصة` : `متأخر ${-p.diff} حصة`;
-export const statusCls = p => p.status === 'behind' ? 'neg' : p.status === 'ahead' ? 'pri' : p.status === 'none' ? '' : 'pos';
+export const statusText = p => p.status === 'none' ? 'لا توجد خطة' : p.status === 'untracked' ? 'لم يُحدَّد موضع الشعبة بعد' : p.diff === 0 ? 'وفق الخطة' : p.diff > 0 ? `متقدم ${p.diff} حصة` : `متأخر ${-p.diff} حصة`;
+export const statusCls = p => p.status === 'behind' ? 'neg' : p.status === 'ahead' ? 'pri' : p.status === 'none' || p.status === 'untracked' ? 'warn' : 'pos';
 const g = iso => (iso ? iso.split('-').reverse().join('/') : '');
 
 // ---------- نموذج Excel (فارغ أو بالخطة الحالية) ----------
@@ -144,7 +144,7 @@ export function PlanPage() {
       <div class="row"><h2 style="margin:0">${className(c)}</h2><span class="grow"></span><span class=${'badge ' + statusCls(p)}>${statusText(p)}</span></div>
       <div class="g-bar" style="position:relative"><i style=${`width:${p.total ? p.done / p.total * 100 : 0}%`}></i></div>
       <div class="small muted">شُرح ${p.done} من ${p.total} حصة مخططة • المفترض حتى الآن ${p.plannedSoFar} • المتاح في الفصل ${p.available}${p.spare ? ` • احتياطي ${p.spare}` : ''}</div>
-      ${p.next ? html`<div><span class="muted small">التالي فعلياً:</span> <b>${p.next.lesson.title}</b> ${p.next.of > 1 ? html`<span class="muted small">(${p.next.k} من ${p.next.of})</span>` : null}</div>` : html`<div class="info small">اكتملت الخطة 🎉</div>`}
+      <${PositionPicker} c=${c} term=${term} p=${p} />
       ${p.shortfall > 0 ? html`<div class="notice small">${p.shortfall} حصة من الخطة لم تجد حصة متاحة قبل نهاية الفصل الدراسي.</div>` : null}
       <div class="row"><button class="btn sm ghost" onClick=${() => setOpen(open === c.id ? null : c.id)}>${open === c.id ? 'إخفاء' : 'عرض'} التوزيع على الحصص</button>
         <button class="btn sm ghost" onClick=${() => printHTML(distributionSheet({ classId: c.id, term }))}><${Icon} name="print" size=${16} /> طباعة التوزيع</button></div>
@@ -165,6 +165,21 @@ export function PlanPage() {
           نزّل <b>نموذج Excel</b> واملأه (الوحدة، الدرس، عدد الحصص، الأسبوع، والتواريخ اختيارية)، ثم اضغط <b>رفع الخطة</b>. ويقبل أيضاً ملف خطتك الحالي إن كانت أعمدته بهذه الأسماء.
           <div class="row" style="justify-content:center;margin-top:12px"><${Btn} cls="primary" onClick=${() => downloadTemplate(grade, term, false)}><${Icon} name="download" /> تنزيل النموذج</${Btn}></div></${Empty}>`}
       <p class="muted small">في شاشة الحصة يظهر الدرس المخطط لذلك اليوم وزر «تم الشرح»؛ كل ضغطة تقدّم الشعبة حصة في الخطة.</p></div>
+  </div>`;
+}
+
+// موضع الشعبة: الدرس الذي ستبدأ به الحصة القادمة (يُضبط عند بدء استخدام التطبيق في منتصف الفصل، أو لتصحيح العدّ)
+function PositionPicker({ c, term, p }) {
+  const us = units(c.grade, term); const today = todayISO();
+  const pl = distribution(c.id, term).rows.find(r => r.date >= today && r.unit)?.unit;
+  const pIdx = unitIndexOf(us, pl);
+  const cur = Math.min(p.done, us.length);
+  const set = async i => { await patch('classes', c.id, { plan_set: { ...(c.plan_set || {}), [term]: { date: today, pos: +i } } }); await audit('تحديد موضع الشعبة في الخطة', `${className(c)}: ${us[+i] ? us[+i].lesson.title : 'اكتملت'}`); toast('حُدِّد موضع الشعبة', 'ok'); };
+  const lbl = x => `${x.lesson.title}${x.of > 1 ? ` (${x.k}/${x.of})` : ''}`;
+  return html`<div class="stack" style="gap:6px">
+    <label class="small muted">الدرس التالي للشعبة (عدّله إن لم يكن صحيحاً):</label>
+    <select value=${cur} onChange=${e => set(e.target.value)} style="font-weight:700">${us.map((x, i) => html`<option value=${i}>${lbl(x)}${i === pIdx ? '  ← حسب التوزيع' : ''}</option>`)}<option value=${us.length}>اكتملت الخطة</option></select>
+    ${!p.tracked && pIdx >= 0 ? html`<div class="row small"><span class="muted">حسب التوزيع اليوم: <b>${lbl(pl)}</b></span><button class="btn sm soft" onClick=${() => set(pIdx)}>ابدأ من هنا</button></div>` : null}
   </div>`;
 }
 

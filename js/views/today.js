@@ -63,7 +63,7 @@ export function TodayPage() {
   const photoReq = ws('photo_requests', r => r.status === 'pending').length;
   if (photoReq) alerts.push({ icon: 'users', text: html`${photoReq} صورة طالب بانتظار اعتمادك`, href: '#/portal?tab=photos' });
   const tNow = termOf(w, today);
-  if (tNow) for (const c of classes()) { const p = progress(c.id, tNow); if (p.total && p.diff <= -2) alerts.push({ icon: 'book', warn: true, text: html`${className(c)} متأخر ${-p.diff} حصة عن الخطة — التالي: <b>${p.next?.lesson.title || ''}</b>`, href: '#/plan' }); }
+  if (tNow) for (const c of classes()) { const p = progress(c.id, tNow); if (p.total && p.tracked && p.diff <= -2) alerts.push({ icon: 'book', warn: true, text: html`${className(c)} متأخر ${-p.diff} حصة عن الخطة — التالي: <b>${p.next?.lesson.title || ''}</b>`, href: '#/plan' }); }
   const lastBackup = localStorage.getItem('daftar-last-backup');
   const needBackup = !lastBackup || daysBetween(lastBackup.slice(0, 10), today) >= 7;
 
