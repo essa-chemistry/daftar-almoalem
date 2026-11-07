@@ -66,6 +66,25 @@ export function cellState(classId, date, period, sid) {
 // صيغة موحدة للمقارنة: «ص ص ن» = «2ص ن»
 const canon = (str, map) => { const { items, bad } = parseCodes(str, map); const m = new Map(); for (const i of items) m.set(i.att ? '@' + i.att : i.code, (m.get(i.att ? '@' + i.att : i.code) || 0) + (i.att ? 0 : i.n)); return [...m.entries()].sort().map(([k, n]) => k + n).join('|') + (bad.length ? '!' : ''); };
 
+// تظليل الصف والعمود: عند مرور الفأرة (خفيف) وللخلية النشطة (أوضح) حتى لا يُخطأ الطالب أو الحصة
+const HL = { hover: null, focus: null };
+function hlStyle() {
+  let el = document.getElementById('paper-hl');
+  if (!el) { el = document.createElement('style'); el.id = 'paper-hl'; document.head.appendChild(el); }
+  const rule = (p, cls) => p ? `.paper-grid tbody tr:nth-child(${p.r}) > td { background-color: var(--${cls}-row); }
+    .paper-grid tbody tr:nth-child(${p.r}) > td.pname { color: var(--primary-strong); font-weight: 800; }
+    .paper-grid tbody tr > td:nth-child(${p.c}) { background-color: var(--${cls}-row); }
+    .paper-grid thead tr:nth-child(2) > th:nth-child(${p.c - 2}) { background-color: var(--${cls}-head); }
+    .paper-grid tbody tr:nth-child(${p.r}) > td:nth-child(${p.c}) { background-color: var(--${cls}-cell); }` : '';
+  el.textContent = rule(HL.hover, 'hl') + rule(HL.focus, 'fc');
+}
+const cellPos = td => (td && td.closest('tbody') && td.cellIndex > 1 ? { r: td.parentElement.sectionRowIndex + 1, c: td.cellIndex + 1 } : null);
+const gridHandlers = {
+  onMouseOver: e => { const p = cellPos(e.target.closest('td')); if (JSON.stringify(p) !== JSON.stringify(HL.hover)) { HL.hover = p; hlStyle(); } },
+  onMouseLeave: () => { HL.hover = null; hlStyle(); },
+};
+export const setFocusHL = el => { HL.focus = cellPos(el?.closest('td')); hlStyle(); };
+
 export function PaperEntryPage({ q = {} }) {
   useStore();
   const today = todayISO();
@@ -188,7 +207,7 @@ export function PaperEntryPage({ q = {} }) {
       </div>
     </div>
     ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص لهذا الفصل في هذه الفترة">${timetables()[0] && timetables()[0].effective_from > from ? html`<span>الجدول الأسبوعي ساري من ${fmtShort(timetables()[0].effective_from)} فقط، فلا تظهر حصص قبله. عدّل تاريخه من <a href="#/settings/timetable">الإعدادات ← الجدول ← «تعديل تاريخ السريان»</a> إلى بداية الفصل الدراسي.</span>` : !timetables().length ? html`<span>لم يُضبط الجدول الأسبوعي بعد. <a href="#/settings/timetable">اضبطه من الإعدادات</a>.</span>` : html`<span>تحقق من أن الأسبوع داخل تواريخ الفصل الدراسي، ومن أن الفصل له حصص في الجدول.</span>`}</${Empty}></div>` : html`
-    <div class="table-wrap paper-wrap"><table class="tbl paper-grid">
+    <div class="table-wrap paper-wrap" ...${gridHandlers}><table class="tbl paper-grid">
       <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">${wkName(g.s)} <span class="wk-d">${fmtShort(g.s)} | ${hd(g.s)}هـ</span></th>`)}</tr>
         <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}هـ</span><br />ح${m.period}</th>`)}</tr></thead>
       <tbody>${rows.map((x, ri) => html`<tr><td class="num">${x.student.seat_no || ri + 1}</td><td class="pname">${x.student.full_name}</td>
@@ -200,7 +219,7 @@ export function PaperEntryPage({ q = {} }) {
           const changed = k in vals && canon(v, map) !== canon(rec, map);
           const bad = v && parseCodes(v, map).bad.length;
           return html`<td class=${'pcell' + (m.first ? ' wk-sep' : '') + (ok ? '' : ' shaded')}>${ok ? html`<input class=${bad ? 'bad' : changed && !v.trim() ? 'del' : changed ? 'good' : rec ? 'has' : ''} value=${v} ref=${el => { inputs.current[k] = el; }} title=${changed && rec ? 'كان: ' + rec : ''}
-            onFocus=${() => setFocus(k)} onInput=${e => setV(k, autocomplete(e.target.value, map))}
+            onFocus=${e => { setFocus(k); setFocusHL(e.target); }} onBlur=${() => setFocusHL(null)} onInput=${e => setV(k, autocomplete(e.target.value, map))}
             onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); move(k, e.shiftKey ? -1 : 1); } }} />` : null}</td>`;
         })}</tr>`)}</tbody></table></div>`}
     `}
@@ -231,7 +250,7 @@ function FullSheet({ cid, setCid, from, weeks, span, setSpan, openCell }) {
       <${Btn} cls="primary" onClick=${doPrint}><${Icon} name="print" /> طباعة الكشف</${Btn}></div>
       <p class="muted small" style="margin:8px 0 0">${fmtShort(a)} — ${fmtShort(b)} • ${cols.filter(m => isHeldStatus(m.status)).length} حصة • اضغط أي خلية لتعديلها. الطباعة A4 أفقي بنفس شكل الكشف الورقي مع ما سُجّل.</p></div>
     ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص في هذه الفترة" /></div>` : html`
-    <div class="table-wrap paper-wrap full-wrap"><table class="tbl paper-grid full-grid">
+    <div class="table-wrap paper-wrap full-wrap" ...${gridHandlers}><table class="tbl paper-grid full-grid">
       <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map(g => { const x = allW.find(y => y.from === g.s); return html`<th colspan=${g.items.length} class="wk-h">${x?.n ? 'أسبوع ' + x.n : fmtShort(g.s)}</th>`; })}<th rowspan="2" class="sum">غياب</th><th rowspan="2" class="sum">تأخر</th><th rowspan="2" class="sum">إيجابي</th><th rowspan="2" class="sum">سلبي</th></tr>
         <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')} title=${`${DAY_SHORT[dow(m.date)]} ${fmtShort(m.date)} (${hd(m.date)}هـ) ح${m.period}`}>${DAY_SHORT[dow(m.date)].slice(0, 2)}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}</span></th>`)}</tr></thead>
       <tbody>${rows.map((x, ri) => { const sid = x.student.id; let ab = 0, la = 0, po = 0, ne = 0;

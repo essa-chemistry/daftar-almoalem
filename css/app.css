@@ -481,3 +481,10 @@ body.floating { background: var(--surface); }
 .full-grid .sum { text-align: center; font-weight: 800; min-width: 44px; background: var(--surface-2); }
 .full-grid td.sum.pos { color: var(--pos, #16a34a); } .full-grid td.sum.neg { color: var(--neg, #dc2626); }
 .full-wrap { max-height: calc(100dvh - 62px - 150px); }
+
+/* تظليل صف الطالب وعمود الحصة في الكشف الورقي */
+:root { --hl-row: color-mix(in oklab, var(--primary) 7%, var(--surface)); --hl-head: color-mix(in oklab, var(--primary) 14%, var(--surface-2));
+  --hl-cell: color-mix(in oklab, var(--primary) 16%, var(--surface));
+  --fc-row: color-mix(in oklab, var(--primary) 13%, var(--surface)); --fc-head: color-mix(in oklab, var(--primary) 26%, var(--surface-2));
+  --fc-cell: color-mix(in oklab, var(--primary) 24%, var(--surface)); }
+.paper-grid td { transition: background-color .08s; }
