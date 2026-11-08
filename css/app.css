@@ -488,3 +488,12 @@ body.floating { background: var(--surface); }
   --fc-row: color-mix(in oklab, var(--primary) 13%, var(--surface)); --fc-head: color-mix(in oklab, var(--primary) 26%, var(--surface-2));
   --fc-cell: color-mix(in oklab, var(--primary) 24%, var(--surface)); }
 .paper-grid td { transition: background-color .08s; }
+
+/* لوحة الطالب: عدد ما سُجّل لكل نوع + زر إزالة سريع */
+.ev-wrap { position: relative; display: grid; }
+.ev-btn.has { border-color: currentColor; }
+.ev-count { position: absolute; top: 6px; inset-inline-start: 8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: currentColor; display: grid; place-items: center; pointer-events: none; }
+.ev-wrap .ev-count { color: var(--primary); font-size: .78rem; font-weight: 800; }
+.ev-wrap .ev-count { background: var(--primary); color: #fff; }
+.ev-minus { position: absolute; top: 4px; inset-inline-end: 4px; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--neg); background: var(--surface); color: var(--neg); font-size: 1.2rem; font-weight: 900; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.ev-minus:hover { background: var(--neg); color: #fff; }

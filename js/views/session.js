@@ -83,6 +83,8 @@ export function SessionPage({ id }) {
       ${counts.absent_unexcused ? html`<span class="badge neg">غائب بدون عذر ${counts.absent_unexcused}</span>` : null}
       ${counts.absent_excused ? html`<span class="badge">غائب بعذر ${counts.absent_excused}</span>` : null}
       <span class="badge pri">أحداث ${evs.length}</span>
+      ${evs.length ? (() => { const last = [...evs].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0]; const t = get('event_types', last.type_id); const who = get('students', last.student_id);
+        return html`<button class="btn sm ghost" title="إزالة آخر ما سُجّل في هذه الحصة" onClick=${async () => { await voidEvent(last.id, 'سُجّل بالخطأ (تراجع من شاشة الحصة)'); toast(`أُزيل: ${t?.name || 'حدث'} — ${shortName(who?.full_name || '')}`, 'ok', 2500); }}><${Icon} name="undo" size=${15} /> إزالة آخر تسجيل: ${t?.name || ''} — ${shortName(who?.full_name || '')}</button>`; })() : null}
       ${mode === 'attendance' ? html`<span class="info small" style="padding:3px 10px">وضع الحضور: كل لمسة تغيّر الحالة (حاضر ← غائب بدون عذر ← بعذر ← متأخر)</span>` : null}
       <span class="grow"></span>
       ${seatMapOf(cls) ? html`<div class="chips"><button class=${'chip' + (layout === 'grid' ? ' on' : '')} onClick=${() => { setLayout('grid'); try { localStorage.setItem('daftar-layout', 'grid'); } catch { } }}>شبكة</button><button class=${'chip' + (layout === 'seats' ? ' on' : '')} onClick=${() => { setLayout('seats'); try { localStorage.setItem('daftar-layout', 'seats'); } catch { } }}>المقاعد</button></div>` : null}
@@ -135,6 +137,11 @@ function StudentSheet({ sessionId, studentId, close }) {
     navigator.vibrate?.(15);
     toast(`${t.icon || ''} ${t.name} — ${shortName(st.full_name)}`, t.valence === 'neg' ? 'warn' : 'ok', 1800);
   };
+  const removeEv = async e => {
+    const t = get('event_types', e.type_id);
+    await voidEvent(e.id, 'سُجّل بالخطأ (من شاشة الحصة)');
+    toast(`أُزيل: ${t?.name || 'حدث'} — ${shortName(st.full_name)}`, 'ok', 2200);
+  };
   const setAtt = async v => {
     if (v === 'late') {
       const r = await formDialog({ title: 'تأخر عن الدخول', fields: [{ name: 'm', label: 'عدد الدقائق (اختياري)', type: 'number', inputmode: 'numeric', value: a?.late_minutes || '' }], okText: 'تسجيل' });
@@ -149,13 +156,12 @@ function StudentSheet({ sessionId, studentId, close }) {
       <div><div class="section-title">الحضور</div><div class="att-btns">${['present', 'late', 'absent_excused', 'absent_unexcused'].map(k => html`<${Btn} cls=${status === k ? 'on' : ''} onClick=${() => setAtt(k)}>${ATT_LABEL[k]}${k === 'late' && a?.late_minutes ? ` (${a.late_minutes}د)` : ''}</${Btn}>`)}</div></div>
       <label class="check"><input type="checkbox" checked=${exempt} onChange=${e => patch('sessions', s.id, { exempt: e.target.checked ? [...(s.exempt || []), studentId] : (s.exempt || []).filter(x => x !== studentId) })} /> إعفاء من الأسئلة اليوم (مريض/متعب) — لا يضر بعدالته</label>
       <div><div class="section-title">تسجيل حدث</div>
-        <div class="ev-grid">${quickTypes().map(t => html`<${Btn} key=${t.id} cls=${'ev-btn ' + t.valence} onClick=${() => add(t)}><span class="e-ic">${t.icon || t.code}</span><span>${t.name}</span><span class="e-pt">${t.points > 0 ? '+' : ''}${fmtNum(t.points)}</span></${Btn}>`)}</div></div>
+        <div class="ev-grid">${quickTypes().map(t => { const mine = evs.filter(e => e.type_id === t.id); return html`<div class="ev-wrap" key=${t.id}><${Btn} cls=${'ev-btn ' + t.valence + (mine.length ? ' has' : '')} onClick=${() => add(t)}><span class="e-ic">${t.icon || t.code}</span><span>${t.name}</span><span class="e-pt">${t.points > 0 ? '+' : ''}${fmtNum(t.points)}</span></${Btn}>
+          ${mine.length ? html`<span class="ev-count">${mine.length}</span><button class="ev-minus" title=${'إزالة آخر «' + t.name + '»'} onClick=${() => removeEv(mine[mine.length - 1])}>−</button>` : null}</div>`; })}</div>
+        <p class="muted small" style="margin:6px 0 0">سجّلت شيئاً بالخطأ؟ اضغط <b>−</b> على الزر نفسه، أو «إزالة» من القائمة بالأسفل.</p></div>
       <div><div class="section-title">ما سُجّل في هذه الحصة</div>
         ${evs.length ? html`<div class="timeline">${evs.map(e => { const t = get('event_types', e.type_id); return html`<div class="tl-item"><span class=${'mk ' + (t?.valence || 'neu')}>${t?.code || '•'}</span><span class="grow">${t?.name || 'نوع محذوف'}${e.factor && e.factor !== 1 ? ` (×${e.factor})` : ''}${e.volunteer ? ' — متطوع' : ''}</span>
-          <button class="btn sm danger-soft" onClick=${async () => {
-            const r = await formDialog({ title: 'إلغاء حدث', fields: [{ name: 'reason', label: 'سبب الإلغاء', required: true, value: 'سُجّل بالخطأ' }], okText: 'إلغاء الحدث' });
-            if (r) { await voidEvent(e.id, r.reason); toast('أُلغي الحدث'); }
-          }}>إلغاء</button></div>`; })}</div>` : html`<p class="muted small">لا شيء بعد.</p>`}</div>
+          <button class="btn sm danger-soft" onClick=${() => removeEv(e)}>إزالة</button></div>`; })}</div>` : html`<p class="muted small">لا شيء بعد.</p>`}</div>
     </div>
     <div class="modal-foot"><button class="btn" onClick=${() => quickNote(s, studentId)}><${Icon} name="note" /> ملاحظة خاصة</button><button class="btn primary" onClick=${close}>تم</button></div>`;
 }

@@ -1,5 +1,5 @@
 // Service Worker: يعمل التطبيق بلا إنترنت (الملفات محلياً + مكتبات CDN بعد أول تحميل)
-const VERSION = 'daftar-v3.0.9';
+const VERSION = 'daftar-v3.1.0';
 const SHELL = [
   './', './index.html', './student.html', './config.js', './manifest.json', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './css/app.css', './css/print.css',
