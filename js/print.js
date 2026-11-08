@@ -33,8 +33,15 @@ function codeKey(extra = []) {
   return `<div class="pr-key">${types.some(t => t.code.trim() === '✓') ? '' : '<span><b>✓</b>حاضر</span>'}${types.map(t => `<span><b>${e(t.code)}</b>${e(t.name)}</span>`).join('')}${extra.join('')}<span><b style="background:#ddd">▨</b>إجازة/حصة ملغاة</span></div>`;
 }
 
+// أعمدة الكشف: حصص الجدول + الحصص اليدوية التي لا تطابق حصة في الجدول
+export function paperColumns(classId, from, to) {
+  const ms = meetingsRange(calCtx(), classId, from, to);
+  const extra = ws('sessions', s => s.class_id === classId && s.date >= from && s.date <= to && !ms.some(m => m.date === s.date && m.period === s.period))
+    .map(s => ({ date: s.date, period: 'm' + s.id, label: s.period ? `ح${s.period}+` : 'يدوية', class_id: classId, status: 'extra', manual: true, sort: s.period || 50 }));
+  return [...ms, ...extra].sort((a, b) => a.date.localeCompare(b.date) || (a.sort ?? a.period) - (b.sort ?? b.period));
+}
 function recordedCodes(classId, studentId, date, period) {
-  const s = findSession(classId, date, period); if (!s) return '';
+  const s = String(period).startsWith('m') ? get('sessions', String(period).slice(1)) : findSession(classId, date, period); if (!s) return '';
   const a = sessionAttendance(s.id).get(studentId);
   const codes = [];
   if (a && ATT_CODE[a.status]) codes.push(ATT_CODE[a.status]);
@@ -47,7 +54,7 @@ function recordedCodes(classId, studentId, date, period) {
 // ---------- كشف المتابعة الأسبوعي ----------
 export function weeklySheet({ classId, from, to, weeksPerPage = 'auto', extraRows = 3, prefill = false, hijri = true, maxCols = 30 }) {
   const cls = get('classes', classId); const ctx = calCtx();
-  const ms = meetingsRange(ctx, classId, from, to).filter(m => m.status !== 'teacher_absent' || true);
+  const ms = prefill ? paperColumns(classId, from, to) : meetingsRange(ctx, classId, from, to);
   // تجميع بالأسبوع وتخطي الأسابيع التي كلها إجازة
   const weeks = [];
   for (const m of ms) {
@@ -81,7 +88,7 @@ export function weeklySheet({ classId, from, to, weeksPerPage = 'auto', extraRow
     const colgroup = `<colgroup><col style="width:${seatW}mm"><col style="width:${nameW}mm">${cells.map(() => '<col>').join('')}<col style="width:${noteW}mm"></colgroup>`;
     const h1 = `<tr><th rowspan="3">م</th><th rowspan="3">اسم الطالب</th>${pw.map(w => `<th class="wk wk-sep" colspan="${w.items.length}">الأسبوع ${w.n} — ${fmtShort(w.items[0].date)}${hijri ? ` | ${fmtHijriShort(w.items[0].date)}` : ''}</th>`).join('')}<th rowspan="3">ملاحظات</th></tr>`;
     const h2 = `<tr>${cells.map(m => `<th class="vt ${m.first ? 'wk-sep' : ''} ${isHeldStatus(m.status) ? '' : 'shade'}">${DAY_SHORT[dow(m.date)]}<br>${fmtShort(m.date)}${hijri ? `<br><span style="font-weight:400">${fmtHijriShort(m.date)}</span>` : ''}</th>`).join('')}</tr>`;
-    const h3 = `<tr>${cells.map(m => `<th class="vt ${m.first ? 'wk-sep' : ''} ${isHeldStatus(m.status) ? '' : 'shade'}">ح${m.period}</th>`).join('')}</tr>`;
+    const h3 = `<tr>${cells.map(m => `<th class="vt ${m.first ? 'wk-sep' : ''} ${isHeldStatus(m.status) ? '' : 'shade'}">${m.label || 'ح' + m.period}</th>`).join('')}</tr>`;
     const body = rows.map((x, i) => {
       const es = enrollmentsOf(x.student.id).filter(e => e.class_id === classId);
       const left = !es.some(e => isEnrolledOn(e, pTo));

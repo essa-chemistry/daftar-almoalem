@@ -1,10 +1,10 @@
 // شاشة الحصة: الحضور، شبكة الطلاب، الأحداث السريعة، الاختيار العادل، وضع الواجب، الملاحظات
 import { html, render, useState, useEffect, useRef, useMemo } from '../lib.js';
-import { S, get, ws, all, save, patch, purge, workspace, roster, className, sessionAttendance, sessionEvents, eventTypes, typeBySys, privateOf } from '../store.js';
+import { S, get, ws, all, save, patch, purge, workspace, calCtx, findSession, roster, className, sessionAttendance, sessionEvents, eventTypes, typeBySys, privateOf } from '../store.js';
 import { useStore, Icon, Avatar, Btn, openModal, ModalHead, toast, formDialog, confirmDialog, go, useLongPress, Empty } from '../ui.js';
 import { setAttendance, addEvent, voidEvent, openSession, deleteSession, sessionContents } from '../ops.js';
 import { choose } from '../picker.js';
-import { periodInfo, termOf } from '../calendar.js';
+import { periodInfo, termOf, meetingsOn, isHeldStatus } from '../calendar.js';
 import { plannedFor, progress, units as planUnits, planPositions, unitIndexOf } from '../plan.js';
 import { statusText, statusCls } from './plan.js';
 import { SeatGrid, seatMapOf } from './seatmap.js';
@@ -68,6 +68,7 @@ export function SessionPage({ id }) {
       <button class="btn sm ghost" title="حذف الحصة (إن فُتحت بالخطأ)" onClick=${() => removeSession(s)}><${Icon} name="trash" size=${16} /></button>
       <${Btn} cls="sm deep" onClick=${() => endSession(s.id)}><${Icon} name="stop" size=${16} /> إنهاء الحصة</${Btn}>
     </div>
+    <${LinkBar} s=${s} />
     <${PlanBar} s=${s} />
     <div class="sess-bar">
       <button class="btn primary pick-btn" onClick=${() => openPicker(s.id)}><${Icon} name="shuffle" /> اختر طالباً <span class="kbd" style="color:#fff;opacity:.8">مسافة</span></button>
@@ -417,6 +418,18 @@ export async function openFloatingPicker(sessionId) {
   win.addEventListener('pagehide', () => render(null, root));
   win.focus?.();
   return true;
+}
+
+// ---------- حصة يدوية في يوم فيه حصة للشعبة في الجدول: ربطها بها حتى تظهر في عمودها في الكشف وتُحسب في التوزيع ----------
+function LinkBar({ s }) {
+  const ms = meetingsOn(calCtx(), s.date, s.class_id).filter(m => isHeldStatus(m.status));
+  if (ms.some(m => m.period === s.period)) return null;
+  const free = ms.filter(m => { const o = findSession(s.class_id, s.date, m.period); return !o || o.id === s.id; });
+  if (!free.length) return null;
+  const link = async p => { await patch('sessions', s.id, { period: p, manual: false }); toast(`رُبطت الحصة بالحصة ${p} في الجدول`, 'ok'); };
+  return html`<div class="notice row small" style="margin-bottom:10px;gap:8px">
+    <span>هذه حصة يدوية، وللشعبة في هذا اليوم حصة في الجدول. اربطها بها لتظهر في عمودها في الكشف الورقي وتُحسب في توزيع الخطة:</span>
+    ${free.map(m => html`<button class="btn sm soft" onClick=${() => link(m.period)}>الحصة ${m.period}</button>`)}</div>`;
 }
 
 // ---------- الخطة: درس هذه الحصة (حسب التوزيع أو يحدده المعلم) وزر «تم الشرح» ----------

@@ -1,10 +1,10 @@
 // المرحلة 2 — الإدخال السريع من الكشف الورقي: نفس شكل كشف المتابعة، تُكتب الرموز في الخلايا فتتحول لأحداث بتاريخ الحصة
 import { html, useState, useRef, useEffect } from '../lib.js';
-import { get, all, save, patch, audit, classes, className, roster, calCtx, findSession, sessionAttendance, sessionEvents, eventTypes, enrollmentsOf, isEnrolledOn } from '../store.js';
+import { ws, get, all, save, patch, audit, classes, className, roster, calCtx, findSession, sessionAttendance, sessionEvents, eventTypes, enrollmentsOf, isEnrolledOn } from '../store.js';
 import { useStore, Icon, Btn, Empty, toast } from '../ui.js';
 import { meetingsRange, isHeldStatus, TERM_LABEL } from '../calendar.js';
 import { studyWeeks, weekOfDate, fmtH } from '../plan.js';
-import { printHTML, weeklySheet } from '../print.js';
+import { printHTML, weeklySheet, paperColumns } from '../print.js';
 import { termRange, currentTerm } from '../calendar.js';
 import { workspace } from '../store.js';
 import { timetables } from '../store.js';
@@ -50,9 +50,11 @@ function autocomplete(val, map) {
   return val;
 }
 
+const sessOf = (classId, date, period) => (String(period).startsWith('m') ? get('sessions', String(period).slice(1)) : findSession(classId, date, +period));
+const colLabel = m => m.label || `ح${m.period}`;
 // ما سُجّل في خلية (حصة × طالب): حالة الحضور + الأحداث ذات الرموز (دون أحداث الحضور النظامية)
 export function cellState(classId, date, period, sid) {
-  const s = findSession(classId, date, period); if (!s) return { s: null, att: null, evs: [], codes: '' };
+  const s = sessOf(classId, date, period); if (!s || s.deleted) return { s: null, att: null, evs: [], codes: '' };
   const a = sessionAttendance(s.id).get(sid);
   const att = a && ATT_SYS[a.status] ? a.status : null;
   const evs = sessionEvents(s.id).filter(e => e.student_id === sid).map(ev => ({ ev, t: get('event_types', ev.type_id) }))
@@ -109,11 +111,11 @@ export function PaperEntryPage({ q = {} }) {
   if (!cls.length) return html`<div class="page"><${Empty} title="لا توجد فصول" /></div>`;
   const to = addDays(from, 7 * weeks - 1);
   const map = codeMap();
-  const ms = meetingsRange(calCtx(), cid, from, to);
+  const ms = paperColumns(cid, from, to);
   const rows = roster(cid, to, { includeLeft: true }).filter(x => enrollmentsOf(x.student.id).some(e => e.class_id === cid && e.start_date <= to && (!e.end_date || e.end_date >= from)));
   const key = (m, sid) => `${m.date}|${m.period}|${sid}`;
   const recCache = new Map();
-  const recOf = k => { if (!recCache.has(k)) { const [date, period, sid] = k.split('|'); recCache.set(k, cellState(cid, date, +period, sid).codes); } return recCache.get(k); };
+  const recOf = k => { if (!recCache.has(k)) { const [date, period, sid] = k.split('|'); recCache.set(k, cellState(cid, date, period, sid).codes); } return recCache.get(k); };
   const valOf = k => (vals[k] ?? recOf(k));
   // الخلايا المعدّلة فقط (إضافة أو تعديل أو حذف ما سُجّل)
   const filled = Object.entries(vals).filter(([k, v]) => canon(v, map) !== canon(recOf(k), map));
@@ -146,7 +148,7 @@ export function PaperEntryPage({ q = {} }) {
     for (const [k, v] of filled) {
       const [date, period, sid] = k.split('|');
       const items = parseCodes(v, map).items;
-      const st = cellState(cid, date, +period, sid);
+      const st = cellState(cid, date, period, sid);
       let s = st.s;
       if (!s) s = await save('sessions', { class_id: cid, date, period: +period, status: 'closed', manual: false, from_paper: true, exempt: [], started_at: null });
       sess.add(s.id);
@@ -178,7 +180,7 @@ export function PaperEntryPage({ q = {} }) {
     if (!focus) return '';
     const [date, period, sid] = focus.split('|');
     const st = rows.find(x => x.student.id === sid)?.student; if (!st) return '';
-    return `${st.full_name} — ${DAY_SHORT[dow(date)]} ${fmtShort(date)} ح${period}`;
+    return `${st.full_name} — ${DAY_SHORT[dow(date)]} ${fmtShort(date)} ${String(period).startsWith("m") ? "حصة يدوية" : "ح" + period}`;
   })();
   return html`<div class="page paper-page" ref=${pageRef}>
     <div class="page-head"><a class="icon-btn" href="#/print"><${Icon} name="back" /></a><div><h1>الإدخال من الكشف الورقي</h1><div class="sub">اكتب الرموز كما في الكشف المطبوع؛ تتحول إلى أحداث بتاريخ الحصة الصحيح. مثال: «2ص ن» = إجابتان صحيحتان ونوم.</div></div>
@@ -209,7 +211,7 @@ export function PaperEntryPage({ q = {} }) {
     ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص لهذا الفصل في هذه الفترة">${timetables()[0] && timetables()[0].effective_from > from ? html`<span>الجدول الأسبوعي ساري من ${fmtShort(timetables()[0].effective_from)} فقط، فلا تظهر حصص قبله. عدّل تاريخه من <a href="#/settings/timetable">الإعدادات ← الجدول ← «تعديل تاريخ السريان»</a> إلى بداية الفصل الدراسي.</span>` : !timetables().length ? html`<span>لم يُضبط الجدول الأسبوعي بعد. <a href="#/settings/timetable">اضبطه من الإعدادات</a>.</span>` : html`<span>تحقق من أن الأسبوع داخل تواريخ الفصل الدراسي، ومن أن الفصل له حصص في الجدول.</span>`}</${Empty}></div>` : html`
     <div class="table-wrap paper-wrap" ...${gridHandlers}><table class="tbl paper-grid">
       <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map((g, i) => html`<th colspan=${g.items.length} class="wk-h">${wkName(g.s)} <span class="wk-d">${fmtShort(g.s)} | ${hd(g.s)}هـ</span></th>`)}</tr>
-        <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}هـ</span><br />ح${m.period}</th>`)}</tr></thead>
+        <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')}>${DAY_SHORT[dow(m.date)]}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}هـ</span><br />${colLabel(m)}</th>`)}</tr></thead>
       <tbody>${rows.map((x, ri) => html`<tr><td class="num">${x.student.seat_no || ri + 1}</td><td class="pname">${x.student.full_name}</td>
         ${cols.map(m => {
           const enr = enrollmentsOf(x.student.id).some(e => e.class_id === cid && isEnrolledOn(e, m.date));
@@ -233,7 +235,7 @@ function FullSheet({ cid, setCid, from, weeks, span, setSpan, openCell }) {
   const t = span === 'weeks' ? null : +span || currentTerm(W, today);
   const r = t ? termRange(W, t) : null;
   const a = r ? r.start : from, b = r ? r.end : addDays(from, 7 * weeks - 1);
-  const ms = meetingsRange(calCtx(), cid, a, b);
+  const ms = paperColumns(cid, a, b);
   const rows = roster(cid, b, { includeLeft: true }).filter(x => enrollmentsOf(x.student.id).some(e => e.class_id === cid && e.start_date <= b && (!e.end_date || e.end_date >= a)));
   const allW = [...studyWeeks(W, 1), ...studyWeeks(W, 2)];
   const hd = iso => { const [, mm, d] = fmtH(iso).split('/'); return `${+d}/${+mm}`; };
@@ -252,7 +254,7 @@ function FullSheet({ cid, setCid, from, weeks, span, setSpan, openCell }) {
     ${!cols.length ? html`<div class="card"><${Empty} icon="calendar" title="لا توجد حصص في هذه الفترة" /></div>` : html`
     <div class="table-wrap paper-wrap full-wrap" ...${gridHandlers}><table class="tbl paper-grid full-grid">
       <thead><tr><th rowspan="2">م</th><th rowspan="2" class="pname">الطالب</th>${wk.map(g => { const x = allW.find(y => y.from === g.s); return html`<th colspan=${g.items.length} class="wk-h">${x?.n ? 'أسبوع ' + x.n : fmtShort(g.s)}</th>`; })}<th rowspan="2" class="sum">غياب</th><th rowspan="2" class="sum">تأخر</th><th rowspan="2" class="sum">إيجابي</th><th rowspan="2" class="sum">سلبي</th></tr>
-        <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')} title=${`${DAY_SHORT[dow(m.date)]} ${fmtShort(m.date)} (${hd(m.date)}هـ) ح${m.period}`}>${DAY_SHORT[dow(m.date)].slice(0, 2)}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}</span></th>`)}</tr></thead>
+        <tr>${cols.map(m => html`<th class=${'num' + (m.first ? ' wk-sep' : '') + (isHeldStatus(m.status) ? '' : ' shaded')} title=${`${DAY_SHORT[dow(m.date)]} ${fmtShort(m.date)} (${hd(m.date)}هـ) ${colLabel(m)}`}>${DAY_SHORT[dow(m.date)].slice(0, 2)}<br />${fmtShort(m.date)}<br /><span class="hj">${hd(m.date)}</span>${m.manual ? html`<br /><span class="hj">${colLabel(m)}</span>` : null}</th>`)}</tr></thead>
       <tbody>${rows.map((x, ri) => { const sid = x.student.id; let ab = 0, la = 0, po = 0, ne = 0;
         const tds = cols.map(m => {
           const enr = enrollmentsOf(sid).some(e => e.class_id === cid && isEnrolledOn(e, m.date));
