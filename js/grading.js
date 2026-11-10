@@ -5,7 +5,7 @@
 
 export const TASK_KINDS = {
   homework: 'واجب', worksheet: 'ورقة عمل مختبر', quiz: 'اختبار قصير',
-  performance: 'مهمة أدائية/مختبر', project: 'مشروع', monthly: 'اختبار شهري', final: 'اختبار نهائي (للعرض فقط)',
+  performance: 'مهمة أدائية/مختبر', project: 'مشروع', monthly: 'اختبار فترة (شهري)', final: 'اختبار نهائي (للعرض فقط)',
 };
 export const HW_STATUS = { done: 'تم', partial: 'ناقص', none: 'لم يحل', late: 'متأخر', excused: 'معذور' };
 export const METHODS = { ratio: 'نسبة', target: 'هدف', deduct: 'خصم' };

@@ -497,3 +497,28 @@ body.floating { background: var(--surface); }
 .ev-wrap .ev-count { background: var(--primary); color: #fff; }
 .ev-minus { position: absolute; top: 4px; inset-inline-end: 4px; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--neg); background: var(--surface); color: var(--neg); font-size: 1.2rem; font-weight: 900; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .ev-minus:hover { background: var(--neg); color: #fff; }
+
+/* دفتر الدرجات */
+.page.wide { max-width: 1600px; }
+.gb-wrap { max-height: calc(100dvh - 62px - 40px); }
+.gb-grid { border-collapse: separate; border-spacing: 0; }
+.gb-grid thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-2); vertical-align: bottom; }
+.gb-grid .pname { white-space: nowrap; position: sticky; inset-inline-start: 0; background: var(--surface); z-index: 2; box-shadow: inset -1px 0 0 var(--line); }
+.gb-grid thead th.pname { background: var(--surface-2); z-index: 4; }
+.gb-grid .pname a { color: inherit; }
+.gb-h { min-width: 104px; max-width: 150px; text-align: center; white-space: normal; padding: 6px 4px !important; }
+.gb-h .gb-t { display: block; font-weight: 800; color: var(--text); line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+.gb-m { font-size: .7rem; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.gb-fill { margin-top: 4px; min-height: 26px !important; padding: 2px 8px !important; font-size: .74rem !important; }
+.gb-h.k-monthly { box-shadow: inset 0 3px 0 var(--primary); }
+.gb-h.k-quiz { box-shadow: inset 0 3px 0 var(--warn, #d97706); }
+.gb-h.k-homework { box-shadow: inset 0 3px 0 var(--pos, #16a34a); }
+.gb-c { padding: 3px !important; text-align: center; }
+.gb-c.shaded { background: repeating-linear-gradient(-45deg, var(--surface-2), var(--surface-2) 4px, transparent 4px, transparent 8px); }
+.gb-in { width: 100%; min-width: 64px; min-height: 34px; text-align: center; font-weight: 700; padding: 2px 4px; }
+.gb-in.bad { border-color: var(--neg); background: var(--neg-bg); }
+.gb-in.exc { color: var(--muted); }
+select.gb-in { padding-inline: 2px; font-size: .82rem; }
+select.gb-in.st-done { color: var(--pos); } select.gb-in.st-none { color: var(--neg); } select.gb-in.st-partial, select.gb-in.st-late { color: var(--warn, #d97706); }
+.gb-sum { background: var(--primary-soft) !important; text-align: center; min-width: 86px; font-size: .8rem; }
+td.gb-sum b { font-size: .95rem; color: var(--primary-strong); }

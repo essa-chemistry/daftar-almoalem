@@ -14,6 +14,7 @@ import { ClassesPage, ClassPage } from './views/classes.js';
 import { StudentPage } from './views/student.js';
 import { ImportPage } from './views/importer.js';
 import { TasksPage, TaskPage } from './views/tasks.js';
+import { GradebookPage } from './views/gradebook.js';
 import { GradesPage, GradeDetailPage } from './views/grades.js';
 import { PrintPage } from './views/printview.js';
 import { SettingsPage, WorkspaceSetup } from './views/settings.js';
@@ -40,7 +41,7 @@ function useRoute() {
 const NAV = [
   { k: 'today', label: 'اليوم', icon: 'today' },
   { k: 'classes', label: 'الفصول', icon: 'users', also: ['class', 'student', 'import', 'names', 'portal'] },
-  { k: 'tasks', label: 'المهام', icon: 'tasks', also: ['task'] },
+  { k: 'tasks', label: 'المهام', icon: 'tasks', also: ['task', 'gradebook'] },
   { k: 'grades', label: 'الدرجات', icon: 'grades', also: ['grade'] },
   { k: 'plan', label: 'الخطة', icon: 'book' },
   { k: 'print', label: 'الطباعة والنماذج', icon: 'print', also: ['paper', 'form'] },
@@ -96,6 +97,7 @@ function Page({ route }) {
     case 'import': return html`<${ImportPage} />`;
     case 'tasks': return html`<${TasksPage} q=${q} />`;
     case 'task': return html`<${TaskPage} id=${a[0]} classId=${q.class} />`;
+    case 'gradebook': return html`<${GradebookPage} q=${q} />`;
     case 'grades': return html`<${GradesPage} q=${q} />`;
     case 'grade': return html`<${GradeDetailPage} classId=${a[0]} term=${+a[1]} studentId=${a[2]} pid=${q.p || null} />`;
     case 'print': return html`<${PrintPage} q=${q} />`;

@@ -6,15 +6,15 @@ import { TASK_KINDS, HW_STATUS, taskMode } from '../grading.js';
 import { todayISO, fmtDate, normDigits } from '../utils.js';
 import { printHTML, taskSheet } from '../print.js';
 
-export async function taskDialog(t = null, presetClass = null) {
+export async function taskDialog(t = null, presetClass = null, preset = {}) {
   const cls = classes();
   if (!cls.length) { toast('أضف فصلاً أولاً', 'warn'); return null; }
   const v = await formDialog({ title: t ? 'تعديل المهمة' : 'مهمة جديدة', size: '', fields: [
-    { name: 'kind', label: 'النوع', type: 'select', options: Object.entries(TASK_KINDS).map(([value, label]) => ({ value, label })), value: t?.kind || 'homework' },
+    { name: 'kind', label: 'النوع', type: 'select', options: Object.entries(TASK_KINDS).map(([value, label]) => ({ value, label })), value: t?.kind || preset.kind || 'homework' },
     { name: 'title', label: 'العنوان', required: true, value: t?.title || '', full: true },
-    { name: 'date', label: 'التاريخ', type: 'date', value: t?.date || todayISO(), required: true },
-    { name: 'due_date', label: 'موعد التسليم', type: 'date', value: t?.due_date || t?.date || todayISO() },
-    { name: 'max_score', label: 'الدرجة العظمى', type: 'number', step: '0.5', value: t?.max_score ?? '', hint: 'للواجب بالحالات اتركها 1' },
+    { name: 'date', label: 'التاريخ', type: 'date', value: t?.date || preset.date || todayISO(), required: true },
+    { name: 'due_date', label: 'موعد التسليم', type: 'date', value: t?.due_date || t?.date || preset.date || todayISO() },
+    { name: 'max_score', label: 'الدرجة العظمى', type: 'number', step: '0.5', value: t?.max_score ?? '', hint: 'فارغة = تلقائي: الواجب بالحالات 1، اختبار الفترة 20، والباقي 10' },
     { name: 'mode', label: 'طريقة الرصد', type: 'select', options: [{ value: '', label: 'تلقائي (الواجب بالحالات، والباقي بالدرجة)' }, { value: 'status', label: 'حالات (تم/ناقص/لم يحل…)' }, { value: 'score', label: 'درجة رقمية' }], value: t?.mode || '' },
     { name: 'class_ids', label: 'الفصول', type: 'multi', options: cls.map(c => ({ value: c.id, label: className(c) })), value: t?.class_ids || (presetClass ? [presetClass] : [cls[0].id]) },
   ], validate: v => !v.class_ids.length ? 'اختر فصلاً واحداً على الأقل' : null });
@@ -31,7 +31,7 @@ export function TasksPage({ q = {} }) {
   const add = async () => { const t = await taskDialog(null, cls || null); if (t) go(`#/task/${t.id}?class=${t.class_ids[0]}`); };
   return html`<div class="page">
     <div class="page-head"><div><h1>المهام والاختبارات</h1><div class="sub">واجبات، أوراق عمل، اختبارات قصيرة، مهام أدائية، مشاريع، واختبارات شهرية</div></div>
-      <div class="actions"><${Btn} cls="primary" onClick=${add}><${Icon} name="plus" /> مهمة جديدة</${Btn}></div></div>
+      <div class="actions"><a class="btn" href=${'#/gradebook' + (cls ? '?class=' + cls : '')}><${Icon} name="grades" /> دفتر الدرجات (جدول)</a><${Btn} cls="primary" onClick=${add}><${Icon} name="plus" /> مهمة جديدة</${Btn}></div></div>
     <div class="row" style="margin-bottom:14px"><select style="max-width:220px" value=${cls} onChange=${e => setCls(e.target.value)}><option value="">كل الفصول</option>${classes().map(c => html`<option value=${c.id}>${className(c)}</option>`)}</select>
       <div class="chips"><button class=${'chip' + (!kind ? ' on' : '')} onClick=${() => setKind('')}>الكل</button>${Object.entries(TASK_KINDS).map(([k, v]) => html`<button class=${'chip' + (kind === k ? ' on' : '')} onClick=${() => setKind(k)}>${v}</button>`)}</div></div>
     ${list.length ? html`<div class="list">${list.map(t => {

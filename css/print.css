@@ -95,3 +95,11 @@ table.pr.dist td.wkc { background: #f4f7fa; }
 table.pr .muted { color: #777; }
 table.pr.plan thead { display: table-header-group; }
 table.pr.plan tr { break-inside: avoid; }
+
+/* سجل الدرجات */
+table.pr.gb { font-size: 8.5pt; }
+table.pr.gb th.v { font-size: 7.6pt; line-height: 1.25; padding: 2px; white-space: normal; }
+table.pr.gb th.v small { font-weight: 400; font-size: 6.8pt; }
+table.pr.gb td { text-align: center; padding: 1px 2px; }
+table.pr.gb td.nm { text-align: right; }
+table.pr.gb .sum { background: #eef4f6; font-weight: 700; }
