@@ -1,5 +1,6 @@
 // الدرجات: جدول الفصل، الاعتماد بلقطة، التصدير، وشاشة شرح الدرجة مع التعديل اليدوي
 import { html, useState } from '../lib.js';
+import { SchemeFix } from './gradebook.js';
 import { ws, get, save, patch, audit, classes, className, workspace, S } from '../store.js';
 import { useStore, Icon, Btn, Empty, go, formDialog, confirmDialog, toast, Avatar } from '../ui.js';
 import { classGradeRows, gradeStudent, schemeFor, lockFor } from '../gradeutil.js';
@@ -85,6 +86,7 @@ export function GradesPage({ q = {} }) {
     ${rng && periods.length ? html`<div class="info small" style="margin-bottom:12px">«${rng.short}»: يُحتسب من ${fmtDate(rng.start)} إلى ${fmtDate(rng.end)}${rng.cumulative ? ' (تراكمي من بداية الفصل الدراسي)' : ''}. هدف المشاركة يُقسَّم بنسبة الحصص التي حضرها الطالب في هذه المدة.</div>` : null}
     ${!r ? html`<div class="notice">حدد تاريخ بداية ونهاية الفصل الدراسي من الإعدادات ← التقويم.</div>` : null}
     ${lock ? html`<div class="locked-bar"><${Icon} name="check" /> معتمدة بتاريخ ${fmtDateTime(lock.locked_at)} — تُعرض قيم اللقطة المحفوظة. أي تعديل يتطلب فك الاعتماد.</div>` : incomplete ? html`<div class="notice" style="margin-bottom:12px">${incomplete} طالب لديهم فئات بلا بيانات بعد (—). المقترحة تتحدث تلقائياً مع كل حدث.</div>` : null}
+    ${c ? html`<${SchemeFix} cid=${c.id} term=${term} />` : null}
     ${c && r ? html`<div class="table-wrap"><table class="tbl nowrap"><thead><tr><th>م</th><th>الطالب</th>${scheme.categories.map(k => html`<th class="num">${k.name}<br /><small>${k.weight} • ${METHODS[k.method]}</small></th>`)}<th class="num">الأدائية<br /><small>40</small></th><th class="num">الشهري<br /><small>${scheme.monthly?.outOf || 20}</small></th><th class="num">المجموع</th></tr></thead>
       <tbody>${rows.map((x, i) => { const sv = snap?.get(x.student.id); return html`<tr class=${'click' + (x.active ? '' : ' voided')} onClick=${() => go(`#/grade/${c.id}/${term}/${x.student.id}${pq}`)}>
         <td class="num">${x.student.seat_no || i + 1}</td><td><span class="row" style="flex-wrap:nowrap"><${Avatar} student=${x.student} size=${30} /> ${x.student.full_name}</span></td>

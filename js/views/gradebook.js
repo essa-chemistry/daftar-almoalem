@@ -3,7 +3,7 @@
 import { html, useState, useRef, useEffect } from '../lib.js';
 import { ws, get, all, save, saveMany, patch, purge, audit, classes, className, roster, enrollmentsOf, isEnrolledOn, workspace } from '../store.js';
 import { useStore, Icon, Btn, Empty, toast, formDialog, openModal, ModalHead, confirmDialog, go } from '../ui.js';
-import { TASK_KINDS, HW_STATUS, taskMode, defaultScheme } from '../grading.js';
+import { TASK_KINDS, HW_STATUS, METHODS, taskMode, defaultScheme } from '../grading.js';
 import { gradeStudent, schemeFor } from '../gradeutil.js';
 import { termRange, currentTerm, TERM_LABEL } from '../calendar.js';
 import { fmtH } from '../plan.js';
@@ -250,6 +250,38 @@ function gradebookSheet(cid, term, group, data) {
     <div class="pr-foot" style="margin-top:12px"><div>المعلم: ${e(workspace()?.identity?.teacher || '')} — التوقيع: ............</div><div>اعتماد المدير: ............</div></div></section>`;
 }
 
+// ---------- تنبيه: فئة مهام محسوبة بطريقة لا تقرأ درجات المهام ----------
+const KIND_GUESS = { homework: ['homework'], lab: ['worksheet', 'performance', 'project'], quizzes: ['quiz'] };
+function guessKinds(c) {
+  if ((c.task_kinds || []).length) return c.task_kinds;
+  if (KIND_GUESS[c.key]) return KIND_GUESS[c.key];
+  const n = normAr(c.name || '');
+  if (n.includes('واجب')) return ['homework'];
+  if (n.includes('اختبار') && n.includes('قصير')) return ['quiz'];
+  if (/مختبر|ورق|عمل|مشروع|اداء/.test(n)) return ['worksheet', 'performance', 'project'];
+  return [];
+}
+export function schemeIssues(cid, term) {
+  const c = get('classes', cid); if (!c) return [];
+  const sc = schemeFor(c.grade, term); const r = termRange(workspace(), term); if (!sc || !r) return [];
+  const kinds = new Set(ws('tasks', t => !t.deleted && (t.class_ids || []).includes(cid) && t.date >= r.start && t.date <= r.end).map(t => t.kind));
+  return (sc.categories || []).filter(x => x.method !== 'ratio').map(x => ({ cat: x, kinds: guessKinds(x) })).filter(x => x.kinds.some(k => kinds.has(k)));
+}
+export function SchemeFix({ cid, term }) {
+  useStore();
+  const iss = schemeIssues(cid, term); if (!iss.length) return null;
+  const c = get('classes', cid);
+  const fix = async () => {
+    const sc = schemeFor(c.grade, term); const ex = ws('grade_schemes', x => +x.grade === +c.grade && +x.term === +term)[0];
+    const cats = sc.categories.map(x => { const f = iss.find(y => y.cat.key === x.key); return f ? { ...x, method: 'ratio', task_kinds: f.kinds } : x; });
+    await save('grade_schemes', { ...(ex || {}), grade: +c.grade, term: +term, categories: cats, monthly: sc.monthly || defaultScheme().monthly, options: sc.options || defaultScheme().options });
+    await audit('تعديل توزيع الدرجات', `${iss.map(x => x.cat.name).join('، ')} ← تُحسب من درجات المهام (نسبة)`);
+    toast('صارت تُحسب من درجات المهام', 'ok');
+  };
+  return html`<div class="notice row" style="margin-bottom:12px;gap:10px"><span class="grow">⚠ ${iss.map(x => html`<b>«${x.cat.name}»</b> `)}طريقة حسابها في توزيع الدرجات «${METHODS[iss[0].cat.method] || iss[0].cat.method}» (من نقاط أحداث الحصة)، لذلك <b>لا تدخل فيها الدرجات التي ترصدها للمهام</b>. حوّلها إلى «نسبة» لتُحسب من درجات الواجبات والاختبارات.</span>
+    <button class="btn primary sm" onClick=${fix}>احسبها من درجات المهام</button><a class="btn ghost sm" href="#/settings/grading">توزيع الدرجات</a></div>`;
+}
+
 // ---------- الصفحة ----------
 export function GradebookPage({ q = {} }) {
   useStore();
@@ -293,6 +325,7 @@ export function GradebookPage({ q = {} }) {
       <span class="grow"></span>
       <div class="chips">${Object.entries(GROUPS).map(([k, g]) => html`<button class=${'chip' + (group === k ? ' on' : '')} onClick=${() => setGroup(k)}>${g.label}</button>`)}</div></div>
       <p class="muted small" style="margin:8px 0 0">اكتب الدرجة واضغط Enter للطالب التالي (الأسهم للتنقل). «ع» = معذور. زر <b>⇣ تعبئة</b> في رأس العمود يرصد الدرجة نفسها لكل الطلاب. الأعمدة الملونة في الآخر = الدرجة المحتسبة في الحساب النهائي${sums.some(s => s.key === 'monthly') ? '، واختبارات الفترة تُحتسب بمتوسطها' : ''}.</p></div>
+    <${SchemeFix} cid=${cid} term=${term} />
     ${!r ? html`<div class="notice">حدد تواريخ الفصل الدراسي من الإعدادات ← التقويم.</div>` : !tasks.length ? html`<div class="card"><${Empty} icon="tasks" title=${'لا توجد ' + (group === 'all' ? 'مهام' : GROUPS[group].label) + ' في ' + TERM_LABEL[term]}>
         أضف عموداً بالزر أعلاه، أو ارفع ملف Excel فيه عمود «اسم الطالب» وأعمدة بعناوين الاختبارات.
         <div class="row" style="justify-content:center;margin-top:10px"><${Btn} cls="primary" onClick=${add}><${Icon} name="plus" /> إضافة</${Btn}><${Btn} onClick=${() => exportExcel(cid, term, group, data)}><${Icon} name="download" /> نموذج Excel بأسماء الطلاب</${Btn}></div></${Empty}></div>`
