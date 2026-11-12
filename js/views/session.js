@@ -11,6 +11,9 @@ import { SeatGrid, seatMapOf } from './seatmap.js';
 import { printHTML, sessionSheet } from '../print.js';
 import { todayISO, nowMinutes, parseHM, fmtDateLong, shortName, normAr, fmtNum } from '../utils.js';
 import { HW_STATUS, taskMode } from '../grading.js';
+import { dispCfg, formatName, sortRows, groupByLetter, openDisplayDialog } from '../display.js';
+import { photoOf } from '../store.js';
+import { attendanceReport } from '../reports.js';
 import { NOTE_KINDS } from '../defaults.js';
 
 const ATT_NEXT = { present: 'absent_unexcused', absent_unexcused: 'absent_excused', absent_excused: 'late', late: 'present' };
@@ -50,7 +53,8 @@ export function SessionPage({ id }) {
   const remaining = s.date === todayISO() && per ? parseHM(per.end) - nowMinutes() : null;
   const counts = { present: 0, late: 0, absent_excused: 0, absent_unexcused: 0 };
   for (const x of list) counts[statusOf(x.student.id)]++;
-  const shown = q ? list.filter(x => normAr(x.student.full_name).includes(normAr(q)) || String(x.student.seat_no) === q) : list;
+  const dc = dispCfg();
+  const shown = sortRows(q ? list.filter(x => normAr(x.student.full_name).includes(normAr(q)) || String(x.student.seat_no) === q) : list, dc.order);
   const exempt = new Set(s.exempt || []);
 
   const tapTile = async x => {
@@ -65,6 +69,7 @@ export function SessionPage({ id }) {
       <div class="grow"><h1>${className(cls)}</h1><div class="muted small">${fmtDateLong(s.date)} ${s.period ? `• الحصة ${s.period}` : '• حصة يدوية'} ${per ? `(${per.start}–${per.end})` : ''} ${s.status === 'closed' ? html`<span class="badge">منتهية</span>` : null}</div></div>
       ${remaining != null && remaining > 0 && remaining < 120 ? html`<span class=${'timer' + (remaining <= 5 ? ' low' : '')}><${Icon} name="clock" size=${16} /> ${remaining} دقيقة</span>` : null}
       <button class="btn sm ghost" onClick=${() => printHTML(sessionSheet({ classId: s.class_id, date: s.date, period: s.period }))}><${Icon} name="print" size=${16} /> كشف الحصة</button>
+      <button class="btn sm ghost" onClick=${() => printHTML(attendanceReport({ sessionId: s.id }))}><${Icon} name="file" size=${16} /> تقرير الحضور</button>
       <button class="btn sm ghost" title="حذف الحصة (إن فُتحت بالخطأ)" onClick=${() => removeSession(s)}><${Icon} name="trash" size=${16} /></button>
       <${Btn} cls="sm deep" onClick=${() => endSession(s.id)}><${Icon} name="stop" size=${16} /> إنهاء الحصة</${Btn}>
     </div>
@@ -88,11 +93,21 @@ export function SessionPage({ id }) {
       ${mode === 'attendance' ? html`<span class="info small" style="padding:3px 10px">وضع الحضور: كل لمسة تغيّر الحالة (حاضر ← غائب بدون عذر ← بعذر ← متأخر)</span>` : null}
       <span class="grow"></span>
       ${seatMapOf(cls) ? html`<div class="chips"><button class=${'chip' + (layout === 'grid' ? ' on' : '')} onClick=${() => { setLayout('grid'); try { localStorage.setItem('daftar-layout', 'grid'); } catch { } }}>شبكة</button><button class=${'chip' + (layout === 'seats' ? ' on' : '')} onClick=${() => { setLayout('seats'); try { localStorage.setItem('daftar-layout', 'seats'); } catch { } }}>المقاعد</button></div>` : null}
+      <button class="btn sm" onClick=${openDisplayDialog} title="صيغة الاسم، الصورة، الترتيب"><${Icon} name="settings" size=${16} /> ترتيب وعرض</button>
       <div class="search" style="min-width:180px"><${Icon} name="search" size=${18} /><input placeholder="بحث بالاسم أو الرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
     </div>
     ${mode === 'homework' ? html`<${HomeworkMode} s=${s} list=${list} statusOf=${statusOf} />` : html`
     ${layout === 'seats' && seatMapOf(cls) && !q ? html`<${SeatGrid} c=${cls} list=${list} renderTile=${x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`} />`
-    : html`<div class="sgrid">${shown.map(x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`)}</div>`}
+    : (() => {
+      const tile = x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`;
+      if (dc.order === 'letters') {
+        const gs = groupByLetter(shown);
+        return dc.flow === 'col'
+          ? html`<div class="lgrid-cols">${gs.map(g => html`<div class="lcol"><div class="lhead">${g.letter} <small>${g.items.length}</small></div>${g.items.map(tile)}</div>`)}</div>`
+          : html`<div class="lgrid-rows">${gs.map(g => html`<div class="lrow"><div class="lhead">${g.letter} <small>${g.items.length}</small></div><div class=${'sgrid' + (dc.avatar === 'none' ? ' compact' : '')}>${g.items.map(tile)}</div></div>`)}</div>`;
+      }
+      return html`<div class=${'sgrid' + (dc.flow === 'col' ? ' colflow' : '') + (dc.avatar === 'none' ? ' compact' : '')}>${shown.map(tile)}</div>`;
+    })()}
     ${!list.length ? html`<${Empty} icon="users" title="لا يوجد طلاب في هذا الفصل بتاريخ الحصة"><a class="btn soft" href=${'#/class/' + s.class_id}>إدارة الفصل</a></${Empty}>` : null}`}
   </div>`;
 }
@@ -101,11 +116,12 @@ function Tile({ x, st, evs, exempt, onTap, onLong }) {
   const lp = useLongPress(onLong, onTap);
   const pv = privateOf(x.student.id);
   const marks = evs.map(e => { const t = get('event_types', e.type_id); return t ? { code: t.code || t.icon, v: t.valence, id: e.id } : null; }).filter(Boolean);
-  const cls = 'stile' + (st.startsWith('absent') ? ' absent' : st === 'late' ? ' late' : '') + (exempt ? ' exempt' : '');
+  const am = dispCfg().avatar; const noav = am === 'none' || (am === 'photo' && !photoOf(x.student.id));
+  const cls = 'stile' + (st.startsWith('absent') ? ' absent' : st === 'late' ? ' late' : '') + (exempt ? ' exempt' : '') + (noav ? ' noav' : '');
   return html`<div class=${cls} ...${lp} role="button" tabindex="0" onKeyDown=${e => e.key === 'Enter' && onTap()}>
     <span class="seat">${x.student.seat_no || ''}</span>${pv.starred ? html`<span class="star">★</span>` : null}
-    <${Avatar} student=${x.student} size=${58} health=${true} />
-    <span class="nm">${shortName(x.student.full_name)}</span>
+    ${noav ? null : html`<${Avatar} student=${x.student} size=${58} health=${true} />`}
+    <span class="nm">${formatName(x.student.full_name)}</span>
     <span class="marks">${st !== 'present' ? html`<span class=${'mk ' + (st === 'absent_excused' ? 'neu' : 'neg')}>${{ late: 'ت', absent_excused: 'ع', absent_unexcused: 'غ' }[st]}</span>` : null}${marks.slice(0, 6).map(m => html`<span class=${'mk ' + m.v}>${m.code}</span>`)}${marks.length > 6 ? html`<span class="mk neu">+${marks.length - 6}</span>` : null}${exempt ? html`<span class="mk neu" title="معفى من الأسئلة اليوم">⊝</span>` : null}</span>
   </div>`;
 }

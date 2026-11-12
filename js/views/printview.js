@@ -8,6 +8,8 @@ import { todayISO, weekStart, addDays, fmtDate, fmtShort, DAY_NAMES, dow } from 
 import { TASK_KINDS } from '../grading.js';
 import { Tabs, go } from '../ui.js';
 import { FormsCenter } from './forms.js';
+import { attendanceReport, periodAttendanceReport } from '../reports.js';
+import { NAME_FMT } from '../display.js';
 
 export function PrintPage({ q = {} }) {
   useStore();
@@ -18,6 +20,7 @@ export function PrintPage({ q = {} }) {
   const [o, setO] = useState({ classId: q.class || cls[0]?.id || '', range: 'week', term: t, from: weekStart(today), weeks: 4, to: addDays(weekStart(today), 27), wpp: 'auto', extra: 3, prefill: false, hijri: true });
   const [s, setS] = useState({ classId: q.class || cls[0]?.id || '', date: today, period: '', prefill: true, whole: false });
   const [tk, setTk] = useState({ taskId: '', classId: '' });
+  const [rp, setRp] = useState({ classId: q.class || cls[0]?.id || '', kind: 'day', date: today, period: '', from: tr?.start || today, to: today, nameFmt: 'full', order: 'status' });
   if (tab === 'forms') return html`<div class="page"><div class="page-head"><div><h1>الطباعة والنماذج</h1><div class="sub">كل نموذج يُعبّأ تلقائياً ويمكن تعديل أي حقل قبل الطباعة.</div></div></div>${tabsEl}<${FormsCenter} /></div>`;
   if (!cls.length) return html`<div class="page"><div class="card"><${Empty} icon="print" title="لا توجد فصول بعد" /></div></div>`;
   const set = (k, v) => setO(x => ({ ...x, [k]: v }));
@@ -67,6 +70,19 @@ export function PrintPage({ q = {} }) {
         <div class="row"><label class="check"><input type="checkbox" checked=${s.whole} onChange=${e => setS({ ...s, whole: e.target.checked })} /> كل حصص هذا الفصل في اليوم</label><label class="check"><input type="checkbox" checked=${s.prefill} onChange=${e => setS({ ...s, prefill: e.target.checked })} /> تعبئة ما سُجّل</label></div>
         <p class="muted small" style="margin:0">${dayMeetings.length ? `حصص هذا الفصل في ${DAY_NAMES[dow(s.date)]}: ${dayMeetings.map(m => m.period).join('، ')}` : 'لا توجد حصة لهذا الفصل في الجدول بهذا التاريخ.'}</p>
         <${Btn} cls="primary lg" onClick=${doSession}><${Icon} name="print" /> طباعة كشف الحصة</${Btn}>
+      </div>
+      <div class="card stack"><h2><${Icon} name="file" /> تقارير الحضور (PDF)</h2>
+        <div class="chips"><button class=${'chip' + (rp.kind === 'day' ? ' on' : '')} onClick=${() => setRp({ ...rp, kind: 'day', order: 'status' })}>كشف حضور يومي (حصة)</button><button class=${'chip' + (rp.kind === 'range' ? ' on' : '')} onClick=${() => setRp({ ...rp, kind: 'range', order: 'alpha' })}>تقرير حضور فترة</button></div>
+        <div class="form-grid">
+          <label class="field"><span>الفصل</span><select value=${rp.classId} onChange=${e => setRp({ ...rp, classId: e.target.value })}>${cls.map(c => html`<option value=${c.id}>${className(c)}</option>`)}</select></label>
+          ${rp.kind === 'day' ? html`<label class="field"><span>التاريخ</span><input type="date" value=${rp.date} onInput=${e => setRp({ ...rp, date: e.target.value, period: '' })} /></label>
+            <label class="field"><span>الحصة</span><select value=${rp.period} onChange=${e => setRp({ ...rp, period: e.target.value })}><option value="">أول حصة مسجلة في اليوم</option>${ws('sessions', x => x.class_id === rp.classId && x.date === rp.date && x.period).map(x => html`<option value=${x.period}>الحصة ${x.period}</option>`)}</select></label>`
+          : html`<label class="field"><span>من</span><input type="date" value=${rp.from} onInput=${e => setRp({ ...rp, from: e.target.value })} /></label><label class="field"><span>إلى</span><input type="date" value=${rp.to} onInput=${e => setRp({ ...rp, to: e.target.value })} /></label>`}
+          <label class="field"><span>اسم الطالب</span><select value=${rp.nameFmt} onChange=${e => setRp({ ...rp, nameFmt: e.target.value })}>${Object.entries(NAME_FMT).map(([v, l]) => html`<option value=${v}>${l}</option>`)}</select></label>
+          <label class="field"><span>الترتيب</span><select value=${rp.order} onChange=${e => setRp({ ...rp, order: e.target.value })}>${(rp.kind === 'day' ? [['status', 'حسب الحالة'], ['seat', 'رقم المقعد']] : [['alpha', 'أبجدي'], ['absence', 'الأكثر غياباً'], ['seat', 'رقم المقعد']]).map(([v, l]) => html`<option value=${v}>${l}</option>`)}</select></label>
+        </div>
+        <p class="muted small" style="margin:0">في نافذة الطباعة اختر «حفظ بتنسيق PDF» لحفظه ملفاً، وفعّل «رسومات الخلفية» لتظهر الألوان.</p>
+        <${Btn} cls="primary lg" onClick=${() => { const nf = rp.nameFmt === 'full' ? 'full' : +rp.nameFmt; printHTML(rp.kind === 'day' ? attendanceReport({ classId: rp.classId, date: rp.date, period: rp.period || null, nameFmt: nf, order: rp.order }) : periodAttendanceReport({ classId: rp.classId, from: rp.from, to: rp.to, nameFmt: nf, order: rp.order })); }}><${Icon} name="print" /> إنشاء التقرير</${Btn}>
       </div>
       <div class="card stack"><h2><${Icon} name="tasks" /> كشف درجات مهمة أو اختبار</h2>
         <label class="field"><span>المهمة</span><select value=${tk.taskId} onChange=${e => setTk({ taskId: e.target.value, classId: get('tasks', e.target.value)?.class_ids?.[0] || '' })}><option value="">— اختر —</option>${tasks.map(t => html`<option value=${t.id}>${t.title} (${TASK_KINDS[t.kind]} — ${fmtShort(t.date)})</option>`)}</select></label>

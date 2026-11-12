@@ -522,3 +522,17 @@ select.gb-in { padding-inline: 2px; font-size: .82rem; }
 select.gb-in.st-done { color: var(--pos); } select.gb-in.st-none { color: var(--neg); } select.gb-in.st-partial, select.gb-in.st-late { color: var(--warn, #d97706); }
 .gb-sum { background: var(--primary-soft) !important; text-align: center; min-width: 86px; font-size: .8rem; }
 td.gb-sum b { font-size: .95rem; color: var(--primary-strong); }
+
+/* ترتيب الطلاب: عمودي، ومجمّع بالحرف، وبدون صورة */
+.sgrid.colflow { display: block; columns: 132px; column-gap: 12px; }
+.sgrid.colflow > .stile { break-inside: avoid; margin-bottom: 12px; width: 100%; }
+.sgrid.compact { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.stile.noav { padding-top: 26px; min-height: 0; justify-content: flex-start; }
+.sgrid.compact.colflow { columns: 150px; }
+.lgrid-rows { display: flex; flex-direction: column; gap: 10px; }
+.lrow { display: grid; grid-template-columns: 46px 1fr; gap: 10px; align-items: start; }
+.lhead { display: grid; place-items: center; background: var(--primary); color: #fff; font-weight: 900; font-size: 1.35rem; border-radius: 14px; min-height: 46px; line-height: 1.1; padding: 4px 0; }
+.lhead small { font-size: .68rem; font-weight: 600; opacity: .85; }
+.lgrid-cols { display: flex; gap: 10px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
+.lcol { flex: 0 0 136px; display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 640px) { .lrow { grid-template-columns: 36px 1fr; } .lhead { font-size: 1.1rem; } }

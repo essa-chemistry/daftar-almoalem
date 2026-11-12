@@ -8,6 +8,8 @@ import { todayISO, daysBetween, fmtDate, shortName, GRADE_NAMES, addDays, fmtNum
 import { termRange, currentTerm } from '../calendar.js';
 import { SeatEditor } from './seatmap.js';
 import { tagLibrary, tagCounts, openTagManager } from '../tags.js';
+import { dispCfg, formatName, sortRows, openDisplayDialog } from '../display.js';
+import { photoOf } from '../store.js';
 
 export function ClassesPage() {
   useStore();
@@ -89,13 +91,14 @@ export function ClassPage({ id, tab = 'students' }) {
     ${tab === 'students' ? html`
       <div class="row" style="margin-bottom:12px"><div class="search grow" style="max-width:420px"><${Icon} name="search" size=${18} /><input placeholder="ابحث بجزء من الاسم أو بالرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
         ${usedTags.length ? html`<select style="width:auto;max-width:220px" value=${tag} onChange=${e => setTag(e.target.value)} title="عرض الطلاب الذين يحملون وسماً معيناً"><option value="">كل الوسوم</option>${usedTags.map(t => html`<option value=${t}>${t}</option>`)}</select>` : null}
-        <button class="btn ghost sm" onClick=${openTagManager}>إدارة الوسوم</button>
+        <button class="btn ghost sm" onClick=${openTagManager}>إدارة الوسوم</button><button class="btn ghost sm" onClick=${openDisplayDialog}>ترتيب وعرض</button>
         <label class="check small"><input type="checkbox" checked=${showLeft} onChange=${e => setShowLeft(e.target.checked)} /> إظهار المنسحبين والمنقولين</label></div>
-      ${shown.length ? html`<div class="sgrid">${shown.map(x => {
-        const pv = privateOf(x.student.id);
-        return html`<div class=${'stile' + (x.active ? '' : ' left')} onClick=${() => go('#/student/' + x.student.id)}>
+      ${shown.length ? html`<div class=${'sgrid' + (dispCfg().flow === 'col' ? ' colflow' : '') + (dispCfg().avatar === 'none' ? ' compact' : '')}>${sortRows(shown, dispCfg().order === 'seat' ? 'seat' : 'alpha').map(x => {
+        const pv = privateOf(x.student.id); const am = dispCfg().avatar;
+        const noav = am === 'none' || (am === 'photo' && !photoOf(x.student.id));
+        return html`<div class=${'stile' + (x.active ? '' : ' left') + (noav ? ' noav' : '')} onClick=${() => go('#/student/' + x.student.id)}>
           <span class="seat">${x.student.seat_no || ''}</span>${pv.starred ? html`<span class="star">★</span>` : null}
-          <${Avatar} student=${x.student} size=${62} health=${true} /><span class="nm">${x.student.full_name}</span>
+          ${noav ? null : html`<${Avatar} student=${x.student} size=${62} health=${true} />`}<span class="nm">${formatName(x.student.full_name)}</span>
           <span class="marks">${(pv.tags || []).slice(0, 2).map(t => html`<span class="badge pri">${t}</span>`)}</span></div>`;
       })}</div>` : html`<${Empty} icon="users" title=${q || tag ? 'لا نتائج' : 'لا يوجد طلاب'}>${!q && !tag ? html`<button class="btn primary" onClick=${add}>إضافة طالب</button>` : null}</${Empty}>`}` : null}
     ${tab === 'seats' ? html`<${SeatEditor} c=${c} />` : null}
