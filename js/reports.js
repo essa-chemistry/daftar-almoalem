@@ -1,8 +1,13 @@
 // التقارير المنسقة (تُطبع أو تُحفظ PDF من نافذة الطباعة): تقرير حضور الحصة، وتقرير حضور فترة
-import { get, ws, workspace, className, roster, findSession, sessionAttendance, sessionEvents, enrollmentsOf, isEnrolledOn } from './store.js';
+import { get, ws, all, workspace, className, classes, privateOf, roster, findSession, sessionAttendance, sessionEvents, enrollmentsOf, isEnrolledOn } from './store.js';
 import { escapeHTML as e, fmtDate, DAY_NAMES, dow, normAr } from './utils.js';
 import { formatName } from './display.js';
 import { fmtH } from './plan.js';
+import { NOTE_KINDS } from './defaults.js';
+import { formDialog, toast } from './ui.js';
+import { printHTML } from './print.js';
+import { NAME_FMT } from './display.js';
+import { tagLibrary } from './tags.js';
 
 export const ST = {
   present: { label: 'حاضر', cls: 'ok', ic: 'M9 12l2 2 4-4M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18' },
@@ -82,4 +87,55 @@ export function periodAttendanceReport({ classId, from, to, nameFmt = 'full', or
       <td><div class="rp-bar ${p < 75 ? 'bad' : p < 90 ? 'warn' : 'ok'}"><i style="width:${p}%"></i><b>${p}%</b></div></td></tr>`; }).join('') || '<tr><td colspan="9">لا توجد حصص مسجلة في هذه الفترة</td></tr>'}</tbody></table>
     <div class="rp-note">الحضور يشمل المتأخر والمستأذن. نسبة الحضور = (الحصص − الغياب بنوعيه − الهروب) ÷ حصص الطالب. طُبع في ${e(fmtDate(new Date().toISOString().slice(0, 10)))}.</div>
     ${sign()}</section>`;
+}
+
+// ---------- تقرير ملاحظات المعلم الخاصة: الطلاب الذين سُجّل لهم وسم أو ملاحظة أو تنبيه صحي فقط ----------
+export function privateNotesRows({ classIds = null, tag = '', inc = { tags: true, notes: true, health: true }, from = '', to = '' } = {}) {
+  const cls = classes().filter(c => !classIds || classIds.includes(c.id));
+  const out = [];
+  for (const c of cls) for (const x of roster(c.id)) {
+    const sid = x.student.id; const pv = privateOf(sid);
+    const tags = inc.tags ? (pv.tags || []) : [];
+    if (tag && !(pv.tags || []).includes(tag)) continue;
+    const notes = inc.notes ? all('notes', n => n.student_id === sid && !n.deleted && (!from || n.date >= from) && (!to || n.date <= to)).sort((a, b) => (a.date || '').localeCompare(b.date || '')) : [];
+    const health = inc.health ? (pv.health || []) : []; const hnote = inc.health ? (pv.health_note || '').trim() : '';
+    if (!tags.length && !notes.length && !health.length && !hnote) continue;
+    out.push({ c, x, tags, notes, health, hnote, starred: !!pv.starred });
+  }
+  return out;
+}
+export function privateNotesReport(opt = {}) {
+  const { nameFmt = 'full' } = opt; const rows = privateNotesRows(opt); const id = workspace()?.identity || {};
+  const byClass = new Map(); for (const r of rows) { if (!byClass.has(r.c.id)) byClass.set(r.c.id, []); byClass.get(r.c.id).push(r); }
+  const nNotes = rows.reduce((a, r) => a + r.notes.length, 0);
+  const tagCount = new Map(); for (const r of rows) for (const t of r.tags) tagCount.set(t, (tagCount.get(t) || 0) + 1);
+  const card = (r, i) => `<div class="rp-st">
+      <div class="rp-st-h"><span class="n">${i + 1}</span><b>${e(formatName(r.x.student.full_name, nameFmt))}</b>${r.starred ? '<span class="star">★</span>' : ''}<small>${e(className(r.c))}${r.x.student.seat_no ? ' • رقم ' + e(r.x.student.seat_no) : ''}</small></div>
+      ${r.tags.length ? `<div class="rp-st-row"><span class="k">الوسوم</span><div>${r.tags.map(t => `<span class="rp-tag">${e(t)}</span>`).join('')}</div></div>` : ''}
+      ${r.health.length || r.hnote ? `<div class="rp-st-row"><span class="k">تنبيه صحي</span><div>${r.health.map(t => `<span class="rp-tag h">${e(t)}</span>`).join('')}${r.hnote ? ` <span class="txt">${e(r.hnote)}</span>` : ''}</div></div>` : ''}
+      ${r.notes.length ? `<div class="rp-st-row"><span class="k">الملاحظات</span><ol>${r.notes.map(n => `<li><small>${n.date ? fmtH(n.date) + 'هـ' : ''}${NOTE_KINDS[n.kind] && n.kind !== 'general' ? ' • ' + e(NOTE_KINDS[n.kind]) : ''}${n.kind === 'reminder' ? (n.done ? ' • تم' : ' • لم يُنفَّذ') : ''}</small> ${e(n.text)}</li>`).join('')}</ol></div>` : ''}
+    </div>`;
+  return `<section class="pr-page rp-page">${banner('ملاحظات المعلم ووسومه')}
+    ${info([['المعلم', e(id.teacher || '')], ['المادة', e(id.subject || '')], ['الفصول', String(byClass.size)], ['تاريخ الطباعة', `${fmtH(new Date().toISOString().slice(0, 10))}هـ`]])}
+    <div class="rp-sec"><h2>الملخص</h2><span class="rp-pill">${rows.length} طالب • ${nNotes} ملاحظة${opt.tag ? ` • وسم «${e(opt.tag)}»` : ''}</span></div>
+    ${tagCount.size ? `<div class="rp-tagsum">${[...tagCount.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => `<span class="rp-tag">${e(t)} <b>${n}</b></span>`).join('')}</div>` : ''}
+    ${rows.length ? [...byClass.values()].map(list => `<div class="rp-sec"><h2>${e(className(list[0].c))}</h2><span class="rp-pill">${list.length} طالب</span></div><div class="rp-sts">${list.map(card).join('')}</div>`).join('') : '<p style="text-align:center;margin:20mm 0">لا يوجد طلاب عليهم وسوم أو ملاحظات بهذه الشروط.</p>'}
+    <div class="rp-note">سري — للمعلم فقط. يشمل الطلاب الذين سُجّل لهم وسم أو ملاحظة خاصة أو تنبيه صحي فقط.</div></section>`;
+}
+
+export async function openNotesReport({ classId = null, tag = '' } = {}) {
+  const cls = classes();
+  const v = await formDialog({ title: 'طباعة ملاحظات المعلم ووسومه', okText: 'إنشاء التقرير', fields: [
+    { name: 'scope', label: 'الفصول', type: 'select', value: classId || 'all', options: [{ value: 'all', label: 'كل الفصول' }, ...cls.map(c => ({ value: c.id, label: className(c) }))] },
+    { name: 'inc', label: 'يشمل', type: 'select', value: 'all', options: [{ value: 'all', label: 'الوسوم والملاحظات والتنبيهات الصحية' }, { value: 'tags', label: 'الوسوم فقط' }, { value: 'notes', label: 'الملاحظات الخاصة فقط' }, { value: 'tags_notes', label: 'الوسوم والملاحظات (بدون الصحية)' }, { value: 'health', label: 'التنبيهات الصحية فقط' }] },
+    { name: 'tag', label: 'وسم معيّن (اختياري)', type: 'select', value: tag, options: [{ value: '', label: 'كل الطلاب الذين عليهم تسجيل' }, ...tagLibrary().map(t => ({ value: t, label: t }))] },
+    { name: 'from', label: 'الملاحظات من تاريخ (اختياري)', type: 'date', value: '' },
+    { name: 'to', label: 'إلى تاريخ (اختياري)', type: 'date', value: '' },
+    { name: 'name', label: 'اسم الطالب', type: 'select', value: 'full', options: Object.entries(NAME_FMT).map(([value, label]) => ({ value, label })) },
+  ] });
+  if (!v) return;
+  const inc = { all: { tags: true, notes: true, health: true }, tags: { tags: true }, notes: { notes: true }, tags_notes: { tags: true, notes: true }, health: { health: true } }[v.inc];
+  const opt = { classIds: v.scope === 'all' ? null : [v.scope], tag: v.tag, inc, from: v.from, to: v.to, nameFmt: v.name === 'full' ? 'full' : +v.name };
+  if (!privateNotesRows(opt).length) return toast('لا يوجد طلاب عليهم تسجيل بهذه الشروط', 'warn');
+  printHTML(privateNotesReport(opt));
 }

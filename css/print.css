@@ -150,3 +150,18 @@ table.pr.gb .sum { background: #eef4f6; font-weight: 700; }
 .rp-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; padding-top: 10px; break-inside: avoid; }
 .rp-sign > div { display: flex; flex-direction: column; gap: 3px; text-align: center; }
 .rp-sign span { font-size: 8pt; color: #8a97a3; } .rp-sign b { font-size: 10pt; }
+/* تقرير ملاحظات المعلم */
+.rp-sts { display: flex; flex-direction: column; gap: 6px; }
+.rp-st { border: 1px solid #dfe6ec; border-radius: 10px; padding: 6px 10px; break-inside: avoid; background: #fff; }
+.rp-st-h { display: flex; align-items: baseline; gap: 8px; border-bottom: 1px dashed #e3e9ee; padding-bottom: 4px; margin-bottom: 4px; }
+.rp-st-h .n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 6px; background: #e6f4f1; color: #0f6e60; font-size: 8pt; font-weight: 800; }
+.rp-st-h b { font-size: 10.5pt; } .rp-st-h small { color: #66727d; font-size: 8pt; margin-inline-start: auto; } .rp-st-h .star { color: #d99a00; }
+.rp-st-row { display: grid; grid-template-columns: 22mm 1fr; gap: 6px; align-items: baseline; padding: 2px 0; font-size: 9pt; }
+.rp-st-row .k { color: #12806f; font-weight: 700; font-size: 8pt; }
+.rp-st-row ol { margin: 0; padding-inline-start: 16px; } .rp-st-row li { margin: 1px 0; line-height: 1.45; }
+.rp-st-row li small { color: #66727d; font-size: 7.6pt; }
+.rp-st-row .txt { color: #34495e; }
+.rp-tag { display: inline-block; padding: 0 8px; margin: 1px 0 1px 4px; border-radius: 99px; background: #e9f0f7; color: #33475b; font-size: 8pt; font-weight: 700; border: 1px solid #d5e0ea; }
+.rp-tag.h { background: #fdecee; color: #c62f3e; border-color: #f2b8be; }
+.rp-tag b { color: #0f6e60; }
+.rp-tagsum { padding: 6px 8px; border-radius: 10px; background: #eef2f7; margin-bottom: 4px; }

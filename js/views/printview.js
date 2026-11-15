@@ -8,7 +8,7 @@ import { todayISO, weekStart, addDays, fmtDate, fmtShort, DAY_NAMES, dow } from 
 import { TASK_KINDS } from '../grading.js';
 import { Tabs, go } from '../ui.js';
 import { FormsCenter } from './forms.js';
-import { attendanceReport, periodAttendanceReport } from '../reports.js';
+import { attendanceReport, periodAttendanceReport, openNotesReport } from '../reports.js';
 import { NAME_FMT } from '../display.js';
 
 export function PrintPage({ q = {} }) {
@@ -81,6 +81,7 @@ export function PrintPage({ q = {} }) {
           <label class="field"><span>اسم الطالب</span><select value=${rp.nameFmt} onChange=${e => setRp({ ...rp, nameFmt: e.target.value })}>${Object.entries(NAME_FMT).map(([v, l]) => html`<option value=${v}>${l}</option>`)}</select></label>
           <label class="field"><span>الترتيب</span><select value=${rp.order} onChange=${e => setRp({ ...rp, order: e.target.value })}>${(rp.kind === 'day' ? [['status', 'حسب الحالة'], ['seat', 'رقم المقعد']] : [['alpha', 'أبجدي'], ['absence', 'الأكثر غياباً'], ['seat', 'رقم المقعد']]).map(([v, l]) => html`<option value=${v}>${l}</option>`)}</select></label>
         </div>
+        <button class="btn soft" onClick=${() => openNotesReport({ classId: rp.classId })}><${Icon} name="file" size=${16} /> ملاحظات المعلم ووسومه (الطلاب المسجّل عليهم فقط)</button>
         <p class="muted small" style="margin:0">في نافذة الطباعة اختر «حفظ بتنسيق PDF» لحفظه ملفاً، وفعّل «رسومات الخلفية» لتظهر الألوان.</p>
         <${Btn} cls="primary lg" onClick=${() => { const nf = rp.nameFmt === 'full' ? 'full' : +rp.nameFmt; printHTML(rp.kind === 'day' ? attendanceReport({ classId: rp.classId, date: rp.date, period: rp.period || null, nameFmt: nf, order: rp.order }) : periodAttendanceReport({ classId: rp.classId, from: rp.from, to: rp.to, nameFmt: nf, order: rp.order })); }}><${Icon} name="print" /> إنشاء التقرير</${Btn}>
       </div>

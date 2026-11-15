@@ -9,6 +9,7 @@ import { termRange, currentTerm } from '../calendar.js';
 import { SeatEditor } from './seatmap.js';
 import { tagLibrary, tagCounts, openTagManager } from '../tags.js';
 import { dispCfg, formatName, sortRows, openDisplayDialog } from '../display.js';
+import { openNotesReport } from '../reports.js';
 import { photoOf } from '../store.js';
 
 export function ClassesPage() {
@@ -91,7 +92,7 @@ export function ClassPage({ id, tab = 'students' }) {
     ${tab === 'students' ? html`
       <div class="row" style="margin-bottom:12px"><div class="search grow" style="max-width:420px"><${Icon} name="search" size=${18} /><input placeholder="ابحث بجزء من الاسم أو بالرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
         ${usedTags.length ? html`<select style="width:auto;max-width:220px" value=${tag} onChange=${e => setTag(e.target.value)} title="عرض الطلاب الذين يحملون وسماً معيناً"><option value="">كل الوسوم</option>${usedTags.map(t => html`<option value=${t}>${t}</option>`)}</select>` : null}
-        <button class="btn ghost sm" onClick=${openTagManager}>إدارة الوسوم</button><button class="btn ghost sm" onClick=${openDisplayDialog}>ترتيب وعرض</button>
+        <button class="btn ghost sm" onClick=${openTagManager}>إدارة الوسوم</button><button class="btn ghost sm" onClick=${openDisplayDialog}>ترتيب وعرض</button><button class="btn ghost sm" onClick=${() => openNotesReport({ classId: c.id, tag })} title="طباعة الطلاب الذين سجّلت لهم وسوماً أو ملاحظات فقط"><${Icon} name="print" size=${15} /> طباعة الملاحظات والوسوم</button>
         <label class="check small"><input type="checkbox" checked=${showLeft} onChange=${e => setShowLeft(e.target.checked)} /> إظهار المنسحبين والمنقولين</label></div>
       ${shown.length ? html`<div class=${'sgrid' + (dispCfg().flow === 'col' ? ' colflow' : '') + (dispCfg().avatar === 'none' ? ' compact' : '')}>${sortRows(shown, dispCfg().order === 'seat' ? 'seat' : 'alpha').map(x => {
         const pv = privateOf(x.student.id); const am = dispCfg().avatar;
