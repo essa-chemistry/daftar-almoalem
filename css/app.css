@@ -536,3 +536,22 @@ td.gb-sum b { font-size: .95rem; color: var(--primary-strong); }
 .lgrid-cols { display: flex; gap: 10px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
 .lcol { flex: 0 0 136px; display: flex; flex-direction: column; gap: 8px; }
 @media (max-width: 640px) { .lrow { grid-template-columns: 36px 1fr; } .lhead { font-size: 1.1rem; } }
+/* البحث عن طالب */
+.finder-btn { display: inline-flex; align-items: center; gap: 8px; margin-inline-start: auto; min-width: 230px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; font-size: .9rem; cursor: pointer; }
+.finder-btn:hover { border-color: var(--primary); color: var(--primary-strong); }
+.finder-btn kbd { margin-inline-start: auto; font: inherit; font-size: .75rem; padding: 0 6px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
+@media (max-width: 860px) { .finder-btn { min-width: 0; padding: 8px; } .finder-btn span, .finder-btn kbd { display: none; } }
+.finder .search.big { padding: 10px 14px; border-radius: 14px; }
+.finder .search.big input { font-size: 1.1rem; }
+.finder-grid { display: grid; grid-template-columns: minmax(220px, 1fr) 1.35fr; gap: 12px; margin-top: 12px; align-items: start; }
+.finder-list { display: flex; flex-direction: column; gap: 4px; max-height: 58vh; overflow: auto; }
+.f-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: start; font: inherit; cursor: pointer; color: var(--text); }
+.f-item.on { background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 35%, transparent); }
+.f-item .f-nm { font-weight: 700; }
+.f-item .badge { white-space: nowrap; }
+.finder-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); position: sticky; top: 0; }
+.f-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.f-stats > div { display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface-2); }
+.f-stats b { font-size: 1.25rem; } .f-stats span { font-size: .75rem; color: var(--muted); }
+.f-stats b.neg { color: var(--neg); } .f-stats b.pos { color: var(--pos); } .f-stats b.warn { color: var(--warn, #d97706); } .f-stats b.pri { color: var(--primary-strong); }
+@media (max-width: 720px) { .finder-grid { grid-template-columns: 1fr; } .finder-list { max-height: 30vh; } .finder-card { position: static; } }

@@ -15,6 +15,7 @@ import { StudentPage } from './views/student.js';
 import { ImportPage } from './views/importer.js';
 import { TasksPage, TaskPage } from './views/tasks.js';
 import { GradebookPage } from './views/gradebook.js';
+import { openFinder, bindFinderKeys } from './views/finder.js';
 import { GradesPage, GradeDetailPage } from './views/grades.js';
 import { PrintPage } from './views/printview.js';
 import { SettingsPage, WorkspaceSetup } from './views/settings.js';
@@ -122,7 +123,7 @@ function App() {
   return html`<div class=${'app' + (sessionMode ? ' in-session' : '')}>
     <aside class="rail"><a class="brand" href="#/today" title="دفتر المعلم"><${Icon} name="hex" size=${26} /></a><${NavItems} route=${route} /><span class="spacer"></span></aside>
     <div class="main">
-      <header class="topbar"><${WsSwitcher} /><span class="today-date">${fmtDateLong(todayISO())}</span><${SyncPill} /><${ThemeBtn} /></header>
+      <header class="topbar"><${WsSwitcher} /><span class="today-date">${fmtDateLong(todayISO())}</span><button class="finder-btn" onClick=${() => openFinder()} title="البحث عن طالب في كل الفصول ( / )"><${Icon} name="search" size=${18} /><span>ابحث عن طالب…</span><kbd>/</kbd></button><${SyncPill} /><${ThemeBtn} /></header>
       ${SYNC.mode === 'demo' ? html`<div class="demo-bar">وضع تجريبي: البيانات محفوظة على هذا الجهاز فقط ولا تُرفع لأي خادم. لربط التطبيق بحسابك اتبع خطوات README.</div>` : null}
       <${Guard} key=${route.name + route.args.join('/') + (route.name === 'form' ? JSON.stringify(route.q) : '')}><${Page} route=${route} /></${Guard}>
     </div>
@@ -179,7 +180,7 @@ async function boot() {
     }
     const saved = localStorage.getItem('daftar-ws');
     setWorkspace(saved && get('workspaces', saved) ? saved : (all('workspaces').find(w => !w.archived)?.id || null));
-    render(html`<${App} />`, root);
+    render(html`<${App} />`, root); bindFinderKeys();
     // نشر لقطات الدرجات للبوابة دورياً (عند تفعيلها وفي الوضع المتصل فقط)
     if (SYNC.mode === 'cloud') { const pub = () => { if (workspace()?.portal?.enabled && SYNC.user && navigator.onLine) publishSnapshots().catch(() => {}); }; setTimeout(pub, 20000); setInterval(pub, 5 * 60000); }
     if (SYNC.mode === 'cloud' && SYNC.user) syncNow().then(() => { if (!S.wsId) { setWorkspace(all('workspaces').find(w => !w.archived)?.id || null); emit(); } });
