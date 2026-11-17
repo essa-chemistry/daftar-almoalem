@@ -35,7 +35,9 @@ function useSessionData(id) {
 export function SessionPage({ id }) {
   useStore();
   const d = useSessionData(id);
-  const [mode, setMode] = useState('grid'); // grid | attendance | homework
+  const [mode, setMode] = useState('grid'); // grid | attendance | homework | quick
+  const [qt, setQt] = useState(() => { try { return localStorage.getItem('daftar-quick-type') || ''; } catch { return ''; } });
+  const [flash, setFlash] = useState(null);
   const [layout, setLayout] = useState(() => { try { return localStorage.getItem('daftar-layout') || 'grid'; } catch { return 'grid'; } });
   const [q, setQ] = useState('');
   const [, tick] = useState(0);
@@ -57,7 +59,22 @@ export function SessionPage({ id }) {
   const shown = sortRows(q ? list.filter(x => normAr(x.student.full_name).includes(normAr(q)) || String(x.student.seat_no) === q) : list, dc.order);
   const exempt = new Set(s.exempt || []);
 
+  // الرصد السريع: كل لمسة = تسجيل الحدث المختار للطالب (والضغط المطوّل يزيل آخر واحد)
+  const qType = mode === 'quick' ? (get('event_types', qt) || eventTypes().find(t => t.sys === 'answer_correct') || quickTypes()[0]) : null;
+  const quickAdd = async x => {
+    const st0 = statusOf(x.student.id);
+    if (st0.startsWith('absent')) return toast(`${shortName(x.student.full_name)} غائب — لم يُسجَّل`, 'warn', 1800);
+    await addEvent(s, x.student.id, qType.id);
+    setFlash(x.student.id + '|' + Date.now()); toast(`${qType.icon || ''} ${qType.name} — ${shortName(x.student.full_name)}`, 'ok', 1200);
+  };
+  const quickRemove = async x => {
+    const mine = sessionEvents(s.id).filter(e => e.student_id === x.student.id && e.type_id === qType.id).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+    if (!mine.length) return toast(`لا يوجد «${qType.name}» لهذا الطالب`, 'warn', 1500);
+    await voidEvent(mine[mine.length - 1].id, 'سُجّل بالخطأ (الرصد السريع)'); toast(`أُزيل: ${qType.name} — ${shortName(x.student.full_name)}`, 'ok', 1500);
+  };
+  const longTile = x => (mode === 'quick' ? quickRemove(x) : quickNote(s, x.student.id));
   const tapTile = async x => {
+    if (mode === 'quick') return quickAdd(x);
     if (mode === 'attendance') {
       const cur = sessionAttendance(s.id).get(x.student.id)?.status || 'present'; // قراءة حديثة لتجنب اللمسات السريعة
       await setAttendance(s, x.student.id, ATT_NEXT[cur]);
@@ -79,9 +96,17 @@ export function SessionPage({ id }) {
       <button class="btn primary pick-btn" onClick=${() => openPicker(s.id)}><${Icon} name="shuffle" /> اختر طالباً <span class="kbd" style="color:#fff;opacity:.8">مسافة</span></button>
       <button class=${'btn ' + (mode === 'attendance' ? 'deep' : '')} onClick=${() => setMode(mode === 'attendance' ? 'grid' : 'attendance')}><${Icon} name="check" /> الحضور</button>
       <button class=${'btn ' + (mode === 'homework' ? 'deep' : '')} onClick=${() => setMode(mode === 'homework' ? 'grid' : 'homework')}><${Icon} name="tasks" /> الواجب</button>
+      <button class=${'btn ' + (mode === 'quick' ? 'deep' : '')} onClick=${() => setMode(mode === 'quick' ? 'grid' : 'quick')} title="كل لمسة على طالب تسجّل له الحدث المختار مباشرة"><${Icon} name="bolt" /> رصد سريع</button>
       <button class="btn" onClick=${() => quickNote(s, null)}><${Icon} name="mic" /> ملاحظة</button>
       <button class="btn" onClick=${() => openPicker(s.id, true)} title="وضع العرض أمام الطلاب"><${Icon} name="screen" /> عرض</button>
     </div>
+    ${mode === 'quick' && qType ? html`<div class="quick-strip">
+      <span class="qs-lbl">⚡ الرصد السريع — المس الطالب لتسجيل:</span>
+      <div class="chips">${quickTypes().slice(0, 10).map(t => html`<button class=${'chip qs-' + t.valence + (t.id === qType.id ? ' on' : '')} onClick=${() => { setQt(t.id); try { localStorage.setItem('daftar-quick-type', t.id); } catch { } }}>${t.icon || t.code} ${t.name}</button>`)}</div>
+      <span class="muted small">ضغطة مطوّلة على الطالب = إزالة آخر «${qType.name}» له. الغائب لا يُسجَّل له.</span>
+      <span class="grow"></span>
+      <button class="btn sm deep" onClick=${() => setMode('grid')}>إنهاء الرصد السريع</button>
+    </div>` : null}
     <div class="att-strip">
       <span class="badge pos">حاضر ${counts.present + counts.late}</span>
       ${counts.late ? html`<span class="badge warn">متأخر ${counts.late}</span>` : null}
@@ -97,9 +122,9 @@ export function SessionPage({ id }) {
       <div class="search" style="min-width:180px"><${Icon} name="search" size=${18} /><input placeholder="بحث بالاسم أو الرقم" value=${q} onInput=${e => setQ(e.target.value)} /></div>
     </div>
     ${mode === 'homework' ? html`<${HomeworkMode} s=${s} list=${list} statusOf=${statusOf} />` : html`
-    ${layout === 'seats' && seatMapOf(cls) && !q ? html`<${SeatGrid} c=${cls} list=${list} renderTile=${x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`} />`
+    ${layout === 'seats' && seatMapOf(cls) && !q ? html`<${SeatGrid} c=${cls} list=${list} renderTile=${x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => longTile(x)} flash=${flash?.startsWith(x.student.id)} qn=${qType ? evs.filter(e => e.student_id === x.student.id && e.type_id === qType.id).length : 0} />`} />`
     : (() => {
-      const tile = x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => quickNote(s, x.student.id)} />`;
+      const tile = x => html`<${Tile} key=${x.student.id} x=${x} st=${statusOf(x.student.id)} evs=${evs.filter(e => e.student_id === x.student.id)} exempt=${exempt.has(x.student.id)} onTap=${() => tapTile(x)} onLong=${() => longTile(x)} flash=${flash?.startsWith(x.student.id)} qn=${qType ? evs.filter(e => e.student_id === x.student.id && e.type_id === qType.id).length : 0} />`;
       if (dc.order === 'letters') {
         const gs = groupByLetter(shown);
         return dc.flow === 'col'
@@ -112,14 +137,14 @@ export function SessionPage({ id }) {
   </div>`;
 }
 
-function Tile({ x, st, evs, exempt, onTap, onLong }) {
+function Tile({ x, st, evs, exempt, onTap, onLong, flash = false, qn = 0 }) {
   const lp = useLongPress(onLong, onTap);
   const pv = privateOf(x.student.id);
   const marks = evs.map(e => { const t = get('event_types', e.type_id); return t ? { code: t.code || t.icon, v: t.valence, id: e.id } : null; }).filter(Boolean);
   const am = dispCfg().avatar; const noav = am === 'none' || (am === 'photo' && !photoOf(x.student.id));
-  const cls = 'stile' + (st.startsWith('absent') ? ' absent' : st === 'late' ? ' late' : '') + (exempt ? ' exempt' : '') + (noav ? ' noav' : '');
+  const cls = 'stile' + (st.startsWith('absent') ? ' absent' : st === 'late' ? ' late' : '') + (exempt ? ' exempt' : '') + (noav ? ' noav' : '') + (flash ? ' flash' : '');
   return html`<div class=${cls} ...${lp} role="button" tabindex="0" onKeyDown=${e => e.key === 'Enter' && onTap()}>
-    <span class="seat">${x.student.seat_no || ''}</span>${pv.starred ? html`<span class="star">★</span>` : null}
+    <span class="seat">${x.student.seat_no || ''}</span>${pv.starred ? html`<span class="star">★</span>` : null}${qn ? html`<span class="qn">${qn}</span>` : null}
     ${noav ? null : html`<${Avatar} student=${x.student} size=${58} health=${true} />`}
     <span class="nm">${formatName(x.student.full_name)}</span>
     <span class="marks">${st !== 'present' ? html`<span class=${'mk ' + (st === 'absent_excused' ? 'neu' : 'neg')}>${{ late: 'ت', absent_excused: 'ع', absent_unexcused: 'غ' }[st]}</span>` : null}${marks.slice(0, 6).map(m => html`<span class=${'mk ' + m.v}>${m.code}</span>`)}${marks.length > 6 ? html`<span class="mk neu">+${marks.length - 6}</span>` : null}${exempt ? html`<span class="mk neu" title="معفى من الأسئلة اليوم">⊝</span>` : null}</span>
