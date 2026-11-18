@@ -17,19 +17,30 @@ export function plannedFor(classId, term) {
 }
 
 // pid: فترة التقويم (null = الفصل الدراسي كاملاً). هدف المشاركة يبقى للفصل كاملاً ويُقسَّم بنسبة ما حضره الطالب في الفترة
+// الفصول التي تُحتسب بيانات الطالب منها في هذا الفصل: الفصل نفسه + الفصول التي نُقل منها «مع بياناته»
+export function carriedClassIds(studentId, classId) {
+  const ids = new Set([classId]); const queue = [classId];
+  while (queue.length) {
+    const c = queue.shift();
+    for (const e of all('enrollments', x => x.student_id === studentId && x.class_id === c && x.carry && x.from_class_id))
+      if (!ids.has(e.from_class_id)) { ids.add(e.from_class_id); queue.push(e.from_class_id); }
+  }
+  return ids;
+}
 export function gradeStudent(studentId, classId, term, { today = todayISO(), pid = null } = {}) {
   const w = workspace(); const cls = get('classes', classId);
   const r = evalRange(w, term, pid);
   if (!r || !cls) return null;
-  const sessions = ws('sessions', s => s.class_id === classId);
+  const ids = carriedClassIds(studentId, classId);
+  const sessions = ws('sessions', s => ids.has(s.class_id));
   return computeStudent({
     term: { start: r.start, end: r.end }, today,
-    enrollments: all('enrollments', e => e.student_id === studentId && e.class_id === classId),
+    enrollments: all('enrollments', e => e.student_id === studentId && ids.has(e.class_id)),
     sessions, plannedSessions: plannedFor(classId, term),
-    attendance: all('attendance', a => a.student_id === studentId && a.class_id === classId),
-    events: all('events', e => e.student_id === studentId && e.class_id === classId),
+    attendance: all('attendance', a => a.student_id === studentId && ids.has(a.class_id)),
+    events: all('events', e => e.student_id === studentId && ids.has(e.class_id)),
     eventTypes: ws('event_types'),
-    tasks: ws('tasks', t => (t.class_ids || []).includes(classId)),
+    tasks: ws('tasks', t => (t.class_ids || []).some(c => ids.has(c))),
     results: all('task_results', x => x.student_id === studentId),
     scheme: schemeFor(cls.grade, term),
     overrides: all('grade_overrides', o => o.student_id === studentId && o.class_id === classId && +o.term === +term && (o.period || null) === r.pid),

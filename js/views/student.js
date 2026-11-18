@@ -148,8 +148,12 @@ function Life({ st }) {
   const transfer = async () => {
     const opts = classes().filter(c => c.id !== cur?.id);
     if (!opts.length) return toast('لا يوجد فصل آخر', 'warn');
-    const v = await formDialog({ title: 'نقل إلى شعبة أخرى', fields: [{ name: 'to', label: 'الفصل الجديد', type: 'select', options: opts.map(c => ({ value: c.id, label: className(c) })), value: opts[0].id }, { name: 'date', label: 'تاريخ السريان', type: 'date', value: todayISO(), required: true }] });
-    if (v) { await transferStudent(st.id, v.to, v.date); toast('تم النقل مع حفظ التاريخ', 'ok'); }
+    const v = await formDialog({ title: 'نقل إلى شعبة أخرى', fields: [
+      { name: 'to', label: 'الفصل الجديد', type: 'select', options: opts.map(c => ({ value: c.id, label: className(c) })), value: opts[0].id },
+      { name: 'date', label: 'تاريخ السريان', type: 'date', value: todayISO(), required: true },
+      { name: 'carry', label: 'بياناته السابقة (مشاركات، غياب، تأخر، واجبات، اختبارات)', type: 'select', value: 'yes', full: true, options: [{ value: 'yes', label: 'تنتقل معه وتُحتسب في درجته بالفصل الجديد' }, { value: 'no', label: 'تبقى في الفصل القديم ويبدأ في الجديد من الصفر' }] },
+    ] });
+    if (v) { await transferStudent(st.id, v.to, v.date, { carry: v.carry === 'yes' }); toast(v.carry === 'yes' ? 'تم النقل — بياناته السابقة محتسبة في الفصل الجديد' : 'تم النقل — يبدأ من الصفر في الفصل الجديد', 'ok', 4000); }
   };
   const withdraw = async () => {
     const v = await formDialog({ title: 'انسحاب الطالب', fields: [{ name: 'date', label: 'تاريخ الانسحاب', type: 'date', value: todayISO(), required: true }, { name: 'reason', label: 'السبب', required: true, full: true }] });
@@ -175,9 +179,11 @@ function Life({ st }) {
   };
   return html`<div class="grid-2">
     <div class="card"><h2>سجل التسجيل في الفصول</h2>
-      <div class="timeline">${es.map(e => html`<div class="tl-item"><span class="grow"><b>${className(get('classes', e.class_id))}</b><div class="small muted">من ${fmtDate(e.start_date)} ${e.end_date ? `إلى ${fmtDate(e.end_date)}` : '— حتى الآن'} ${e.end_reason ? `(${e.end_reason})` : ''}</div></span></div>`)}</div>
+      <div class="timeline">${es.map(e => html`<div class="tl-item"><span class="grow"><b>${className(get('classes', e.class_id))}</b><div class="small muted">من ${fmtDate(e.start_date)} ${e.end_date ? `إلى ${fmtDate(e.end_date)}` : '— حتى الآن'} ${e.end_reason ? `(${e.end_reason})` : ''}</div>
+        ${e.from_class_id ? html`<div class="row small" style="gap:6px;margin-top:4px">${e.carry ? html`<span class="badge pos">بياناته من ${className(get('classes', e.from_class_id))} محتسبة هنا</span>` : html`<span class="badge">بدأ من الصفر (بياناته في ${className(get('classes', e.from_class_id))})</span>`}
+          <button class="btn sm ghost" onClick=${async () => { await patch('enrollments', e.id, { carry: !e.carry }); await audit('تعديل احتساب بيانات منقول', `${st.full_name}: ${!e.carry ? 'تُحتسب' : 'لا تُحتسب'} بيانات ${className(get('classes', e.from_class_id))} في ${className(get('classes', e.class_id))}`); toast(!e.carry ? 'صارت بياناته السابقة محتسبة' : 'أُلغي احتساب بياناته السابقة', 'ok'); }}>${e.carry ? 'إلغاء الاحتساب' : 'احتساب بياناته السابقة هنا'}</button></div>` : null}</span></div>`)}</div>
       ${st.status === 'withdrawn' ? html`<div class="notice" style="margin-top:10px">منسحب بتاريخ ${fmtDate(st.withdraw_date)} — ${st.withdraw_reason || ''}</div>` : null}
-      <p class="muted small" style="margin-top:10px">كل الحسابات والتقارير تحتسب فقط الفترة التي كان فيها الطالب مسجلاً في الفصل.</p></div>
+      <p class="muted small" style="margin-top:10px">عند النقل «مع بياناته» تُحتسب مشاركاته وغيابه وواجباته واختباراته من الفصل السابق في درجته بالفصل الجديد، وفي تقرير ولي الأمر وبوابة الطالب. وتبقى سجلات كل حصة في كشف فصلها الأصلي بتاريخها.</p></div>
     <div class="card stack"><h2>إجراءات</h2>
       ${cur ? html`<button class="btn" onClick=${transfer}><${Icon} name="swap" /> نقل إلى شعبة أخرى بتاريخ سريان</button><button class="btn" onClick=${withdraw}><${Icon} name="logout" /> انسحاب بتاريخ وسبب</button>`
       : html`<button class="btn primary" onClick=${reinstate}><${Icon} name="undo" /> إعادة الطالب</button>`}

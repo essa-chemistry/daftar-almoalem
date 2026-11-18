@@ -82,13 +82,13 @@ export function nextSeat(classId) {
   const seats = all('enrollments', e => e.class_id === classId).map(e => +get('students', e.student_id)?.seat_no || 0);
   return (Math.max(0, ...seats) + 1);
 }
-export async function transferStudent(studentId, toClassId, date) {
+export async function transferStudent(studentId, toClassId, date, { carry = true } = {}) {
   const es = enrollmentsOf(studentId);
   const cur = es.find(e => isEnrolledOn(e, date)) || es.find(e => !e.end_date);
   if (cur && cur.class_id === toClassId) throw new Error('الطالب مسجل في هذا الفصل بالفعل');
   if (cur) await patch('enrollments', cur.id, { end_date: addDays(date, -1), end_reason: 'انتقال' });
-  await save('enrollments', { student_id: studentId, class_id: toClassId, start_date: date, end_date: null, from_class_id: cur?.class_id || null });
-  await audit('نقل طالب', `${get('students', studentId)?.full_name} إلى ${get('classes', toClassId)?.name} من ${date}`);
+  await save('enrollments', { student_id: studentId, class_id: toClassId, start_date: date, end_date: null, from_class_id: cur?.class_id || null, carry: !!(carry && cur) });
+  await audit('نقل طالب', `${get('students', studentId)?.full_name} إلى ${get('classes', toClassId)?.name} من ${date}${carry && cur ? ' (مع بياناته السابقة)' : ''}`);
 }
 export async function withdrawStudent(studentId, date, reason) {
   const es = enrollmentsOf(studentId).filter(e => !e.end_date || e.end_date >= date);

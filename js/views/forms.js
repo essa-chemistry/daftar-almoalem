@@ -4,7 +4,7 @@ import { S, get, all, ws, save, patch, audit, workspace, classes, className, ros
 import { useStore, Icon, Btn, Empty, go, formDialog, toast, Avatar } from '../ui.js';
 import { printHTML } from '../print.js';
 import { behaviorFormSheet, referralSheet, parentReportSheet } from '../forms.js';
-import { gradeStudent } from '../gradeutil.js';
+import { gradeStudent, carriedClassIds } from '../gradeutil.js';
 import { currentTerm, termRange, periodAt, evalPeriods, evalRange, defaultPeriod } from '../calendar.js';
 import { REFERRAL_TO, REFERRAL_STATUS, RESPONSES, SEVERITIES, DEFAULT_REFERRAL_REASONS, DEFAULT_PARENT_TEMPLATES, severityOf } from '../defaults.js';
 import { todayISO, addDays, fmtDate, fmtShort, nowMinutes, uuid } from '../utils.js';
@@ -236,11 +236,12 @@ function parentStats(stId, cls, term, pid = null) {
   const w = workspace(); const r = evalRange(w, term, pid); if (!r) return null;
   const inT = d => d >= r.start && d <= r.end;
   const types = new Map(eventTypes({ activeOnly: false }).map(t => [t.id, t]));
-  const evs = all('events', e => e.student_id === stId && e.class_id === cls.id && !e.voided && inT(e.date));
+  const ids = carriedClassIds(stId, cls.id);
+  const evs = all('events', e => e.student_id === stId && ids.has(e.class_id) && !e.voided && inT(e.date));
   const positive = evs.filter(e => types.get(e.type_id)?.valence === 'pos').length;
   const correct = evs.filter(e => types.get(e.type_id)?.sys === 'answer_correct').length;
-  const asked = all('picks', p => p.student_id === stId && p.class_id === cls.id && inT(p.date) && (p.consumed || p.volunteer)).length;
-  const tasks = ws('tasks', t => (t.class_ids || []).includes(cls.id) && inT(t.date) && t.date <= todayISO());
+  const asked = all('picks', p => p.student_id === stId && ids.has(p.class_id) && inT(p.date) && (p.consumed || p.volunteer)).length;
+  const tasks = ws('tasks', t => (t.class_ids || []).some(c => ids.has(c)) && inT(t.date) && t.date <= todayISO());
   const res = new Map(all('task_results', x => x.student_id === stId).map(x => [x.task_id, x]));
   const hw = { total: 0, done: 0, partial: 0, late: 0, none: 0 };
   for (const t of tasks.filter(t => t.kind === 'homework' && taskMode(t) === 'status')) { const x = res.get(t.id); if (!x?.status || x.status === 'excused') continue; hw.total++; hw[x.status]++; }
