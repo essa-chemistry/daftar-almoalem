@@ -507,7 +507,7 @@ body.floating { background: var(--surface); }
 .gb-grid thead th.pname { background: var(--surface-2); z-index: 4; }
 .gb-grid .pname a { color: inherit; }
 .gb-h { min-width: 104px; max-width: 150px; text-align: center; white-space: normal; padding: 6px 4px !important; }
-.gb-h .gb-t { display: block; font-weight: 800; color: var(--text); line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+.gb-h .gb-t { display: block; font-weight: 800; color: var(--ink); line-height: 1.3; max-height: 2.6em; overflow: hidden; }
 .gb-m { font-size: .7rem; font-weight: 400; color: var(--muted); white-space: nowrap; }
 .gb-fill { margin-top: 4px; min-height: 26px !important; padding: 2px 8px !important; font-size: .74rem !important; }
 .gb-h.k-monthly { box-shadow: inset 0 3px 0 var(--primary); }
@@ -545,7 +545,7 @@ td.gb-sum b { font-size: .95rem; color: var(--primary-strong); }
 .finder .search.big input { font-size: 1.1rem; }
 .finder-grid { display: grid; grid-template-columns: minmax(220px, 1fr) 1.35fr; gap: 12px; margin-top: 12px; align-items: start; }
 .finder-list { display: flex; flex-direction: column; gap: 4px; max-height: 58vh; overflow: auto; }
-.f-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: start; font: inherit; cursor: pointer; color: var(--text); }
+.f-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: start; font: inherit; cursor: pointer; color: var(--ink); }
 .f-item.on { background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 35%, transparent); }
 .f-item .f-nm { font-weight: 700; }
 .f-item .badge { white-space: nowrap; }
@@ -564,3 +564,30 @@ td.gb-sum b { font-size: .95rem; color: var(--primary-strong); }
 .stile .star + .qn { inset-inline-end: 30px; }
 .stile.flash { animation: qflash .6s ease-out; }
 @keyframes qflash { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--pos) 70%, transparent); transform: scale(.96); } 60% { box-shadow: 0 0 0 10px transparent; transform: scale(1.02); } 100% { transform: none; } }
+/* تحليل الدرجات والرسوم */
+.vz { width: 100%; height: auto; display: block; font-family: inherit; --vz-s1: #2a78d6; --vz-crit: #d03b3b; }
+:root[data-theme="dark"] .vz { --vz-s1: #3987e5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vz { --vz-s1: #3987e5; } }
+.vz .vz-grid { stroke: var(--line); stroke-width: 1; }
+.vz .vz-base { stroke: var(--muted); stroke-width: 1; opacity: .6; }
+.vz .vz-ref { stroke: var(--vz-crit); stroke-width: 1.2; stroke-dasharray: 4 4; opacity: .8; }
+.vz .vz-ax { fill: var(--muted); font-size: 11px; }
+.vz .vz-lbl { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.vz .vz-lbl.small { font-size: 10.5px; font-weight: 600; }
+.vz .vz-val { fill: var(--ink); font-size: 12px; font-weight: 800; }
+.vz .vz-sub { fill: var(--muted); font-weight: 500; font-size: 10.5px; }
+.vz .vz-bar { fill: var(--vz-s1); } .vz .vz-bar.crit, .vz .vz-pt.crit { fill: var(--vz-crit); }
+.vz .vz-track { fill: var(--surface-2); }
+.vz .vz-line { fill: none; stroke: var(--vz-s1); stroke-width: 2; }
+.vz .vz-range { stroke: var(--vz-s1); stroke-width: 3; opacity: .25; stroke-linecap: round; }
+.vz .vz-dot { fill: var(--vz-s1); stroke: var(--surface); stroke-width: 2; }
+.vz .vz-pt { fill: var(--vz-s1); stroke: var(--surface); stroke-width: 2; opacity: .85; }
+.vz .vz-hit:hover .vz-bar, .vz .vz-hit:hover .vz-dot, .vz .vz-hit:hover .vz-pt { filter: brightness(1.15); stroke: var(--ink); stroke-width: 1.5; }
+.vz-box { width: 100%; } .vz-box.scroll { overflow-x: auto; } .vz-box.scroll .vz { min-width: 560px; }
+.an-stats { margin-bottom: 12px; }
+.an-ins ul { margin: 0; padding-inline-start: 20px; line-height: 1.9; }
+.an-grid { margin-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .an-grid { grid-template-columns: 1fr; } }
+.vz-box .vz { max-height: 320px; }
+.an-grid .span-2 { grid-column: 1 / -1; }
+.an-grid .card h2 { font-size: 1.05rem; margin: 0 0 8px; }

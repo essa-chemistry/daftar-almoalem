@@ -165,3 +165,21 @@ table.pr.gb .sum { background: #eef4f6; font-weight: 700; }
 .rp-tag.h { background: #fdecee; color: #c62f3e; border-color: #f2b8be; }
 .rp-tag b { color: #0f6e60; }
 .rp-tagsum { padding: 6px 8px; border-radius: 10px; background: #eef2f7; margin-bottom: 4px; }
+/* تقرير تحليل الدرجات */
+.an-print .vz { width: 100%; height: auto; --vz-s1: #2a78d6; --vz-crit: #d03b3b; }
+.an-print .vz .vz-grid { stroke: #e3e8ed; } .an-print .vz .vz-base { stroke: #8a97a3; }
+.an-print .vz .vz-ref { stroke: #d03b3b; stroke-dasharray: 4 4; }
+.an-print .vz .vz-ax { fill: #66727d; font-size: 10px; } .an-print .vz .vz-lbl { fill: #1d2b36; font-size: 11px; font-weight: 700; }
+.an-print .vz .vz-val { fill: #1d2b36; font-size: 11px; font-weight: 800; } .an-print .vz .vz-sub { fill: #66727d; font-size: 9.5px; }
+.an-print .vz .vz-bar, .an-print .vz .vz-dot, .an-print .vz .vz-pt { fill: #2a78d6; } .an-print .vz .crit { fill: #d03b3b; }
+.an-print .vz .vz-track { fill: #eef2f7; } .an-print .vz .vz-line { fill: none; stroke: #2a78d6; stroke-width: 2; }
+.an-print .vz .vz-range { stroke: #2a78d6; stroke-width: 3; opacity: .25; } .an-print .vz .vz-dot, .an-print .vz .vz-pt { stroke: #fff; stroke-width: 2; }
+.an-print h3 { font-size: 10.5pt; margin: 10px 0 4px; border-inline-start: 4px solid #12806f; padding-inline-start: 7px; break-after: avoid; }
+.an-print .an-kpis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin: 6px 0 8px; }
+.an-print .an-kpis > div { border: 1px solid #dfe6ec; border-radius: 8px; padding: 4px 6px; text-align: center; background: #fbfcfd; }
+.an-print .an-kpis span { display: block; font-size: 7.5pt; color: #66727d; } .an-kpis b { font-size: 12pt; }
+.an-print .an-ins { border: 1px solid #cfe5e0; background: #f1f8f6; border-radius: 10px; padding: 6px 10px; font-size: 9pt; }
+.an-print .an-ins ul { margin: 2px 0 0; padding-inline-start: 16px; line-height: 1.6; }
+.an-print .an-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; break-inside: avoid; }
+.an-print svg { break-inside: avoid; }
+.an-print table.pr { font-size: 8.5pt; }
